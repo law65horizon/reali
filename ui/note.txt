@@ -1,0 +1,70 @@
+experiences: 
+    --about you:
+        --number of years you've been doing what experience you're offering
+        --personal title for said experience(like a nickname but more professional)
+        --expertise. show your experience
+    --what you offer(specific parts  of the event(experience)). should be in chronological order
+    --location(where guest would meet you)
+    --things to know(similar to frequently asked questions. this would be helpful to guests)
+
+
+Multi-Step Form for Posting Experiences
+This form is designed for hosts to post experiences on your Expo application. It’s split into 6 screens, each collecting specific data to build guest satisfaction and confidence. Below are the screens, fields, and guidance.
+
+Screen 1: Experience Basics
+Purpose: Provide a quick snapshot of the experience.  
+
+TitleText inputExample: "Sunset Photography Walk"  
+CategoryDropdown: Tour, Workshop, Class, Adventure, etc.  
+Location (Meeting Point)Text inputExample: "Pier 39 Entrance"  
+DurationNumber input (e.g., "2 hours")  
+Group SizeMin (number input)Max (number input)Example: "Min: 2, Max: 10"
+
+
+Screen 2: Host Information
+Purpose: Showcase the host’s expertise and build trust.  
+
+Years of ExperienceNumber inputExample: "5 years"  
+Professional TitleText inputExample: "Certified Photography Guide"  
+Brief BioTextarea (150-200 words)Guidance: "Share your background, passion, and any certifications or awards."Example: "I’ve been capturing San Francisco’s beauty for 5 years..."
+
+
+Screen 3: Experience Description
+Purpose: Detail what guests will do, in order.  
+
+OverviewTextarea (50-100 words)Guidance: "Give an engaging summary of the experience."Example: "Learn photography basics while enjoying a sunset stroll..."  
+ItineraryAddable list of activities  
+Activity Title (e.g., "Intro to Camera Settings")  
+Description (e.g., "20-minute lesson on exposure")Example: "1. Intro (20 min), 2. Photo Walk (1 hr), 3. Review (20 min)"
+
+
+
+
+Screen 4: Photos
+Purpose: Attract guests with visuals.  
+
+PhotosFile upload (min 3)Optional captionsExample: "Sunset over the bay – Caption: ‘Our final stop’"
+
+
+Screen 5: Logistics
+Purpose: Enable booking with clear details.  
+
+AvailabilityDate/time picker or recurring schedule (e.g., "Every Saturday at 5 PM")  
+PriceNumber input (per person)Example: "$30"
+
+
+Screen 6: Additional Information
+Purpose: Set expectations and answer questions.  
+
+What’s IncludedTextarea or listExample: "Tripod rental, water"  
+What Guests Need to Bring/KnowTextarea or listExample: "Camera, comfortable shoes"  
+FAQs (Things to Know)activities (e.g., "Q: Do I need my own camera? A: No, we provide rentals.")*  
+Cancellation PolicyText inputExample: "Free cancellation up to 24 hours before"
+
+
+Additional Features
+
+Progress Indicator: "Step X of 6".
+Save Draft: Hosts can resume later.
+Validation: Ensure required fields are complete.
+Review Screen: Final summary before submission.

@@ -1,0 +1,432 @@
+# Updated experience.graphql
+type Address {
+  id: ID!
+  street: String!
+  city: String!
+  postal_code: String
+  country: String!
+  latitude: Float
+  longitude: Float
+}
+
+type User {
+  id: ID!
+  name: String!
+  uid: String!
+  email: String!
+  phone: String
+  description: String
+  created_at: String!
+  address_id: ID
+  address: Address
+}
+
+type ExperienceImage {
+  id: ID!
+  experience_id: ID!
+  url: String!
+  meta_data: String
+  caption: String
+}
+
+type Experience {
+  id: ID!
+  host: User!
+  host_id: ID!
+  address: Address!
+  address_id: ID!
+  title: String!
+  brief_bio: String!
+  category: String!
+  years_of_experience: Int!
+  professional_title: String!
+  price: Float!
+  group_size_min: Int!
+  group_size_max: Int!
+  duration_minutes: Int!
+  experience_overview: String!
+  cancellation_policy: String
+  status: String!
+  images: [ExperienceImage!]!
+  itineraries: [ExperienceItinerary!]!
+  itinerary_days: [ItineraryDay!]!
+  faqs: [ExperienceFAQ!]!
+  bookings: [ExperienceBooking!]!
+  reviews: [ExperienceReview!]!
+  created_at: String!
+  updated_at: String!
+}
+
+type ExperienceItinerary {
+  id: ID!
+  experience_id: ID!
+  day: Int!
+  description: String!
+  start_time: String
+  end_time: String
+}
+
+type ItineraryDay {
+  id: ID!
+  experience_id: ID!
+  date: String!
+  start_time: String
+  end_time: String
+  activities: [Activity!]!
+}
+
+type Activity {
+  id: ID!
+  itinerary_day_id: ID!
+  title: String!
+  description: String
+  duration_minutes: Int
+  thumbnail_url: String
+  location: String
+}
+
+type ExperienceFAQ {
+  id: ID!
+  experience_id: ID!
+  question: String!
+  answer: String!
+  created_at: String!
+}
+
+type ExperienceBooking {
+  id: ID!
+  experience_id: ID!
+  user_id: ID!
+  user: User!
+  start_date: String!
+  end_date: String!
+  status: String!
+  created_at: String!
+}
+
+type ExperienceReview {
+  id: ID!
+  experience_id: ID!
+  user_id: ID!
+  user: User!
+  rating: Int!
+  comment: String
+  created_at: String!
+}
+
+type CloudinarySignature {
+  signature: String!
+  timestamp: String!
+  cloudName: String!
+  apiKey: String!
+}
+
+type ExperienceConnection {
+  totalCount: Int!
+  edges: [ExperienceEdge!]!
+  pageInfo: PageInfo!
+}
+
+type ExperienceEdge {
+  cursor: String!
+  node: Experience!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  endCursor: String
+}
+
+input AddressInput {
+  street: String!
+  city: String!
+  postal_code: String
+  country: String!
+  latitude: Float
+  longitude: Float
+}
+
+input ExperienceInput {
+  host_id: ID!
+  address: AddressInput!
+  title: String!
+  brief_bio: String!
+  category: String!
+  years_of_experience: Int!
+  professional_title: String!
+  price: Float!
+  group_size_min: Int!
+  group_size_max: Int!
+  duration_minutes: Int!
+  experience_overview: String!
+  cancellation_policy: String
+  image_urls: [String!]!
+  itineraries: [ExperienceItineraryInput!]!
+  itinerary_days: [ItineraryDayInput!]!
+  faqs: [ExperienceFAQInput!]!
+}
+
+input ExperienceItineraryInput {
+  day: Int!
+  description: String!
+  start_time: String
+  end_time: String
+}
+
+input ItineraryDayInput {
+  date: String!
+  start_time: String
+  end_time: String
+  activities: [ActivityInput!]!
+}
+
+input ActivityInput {
+  title: String!
+  description: String
+  thumbnail_url: String
+  duration_minutes: Int
+  location: String
+}
+
+input ExperienceFAQInput {
+  question: String!
+  answer: String!
+}
+
+input ExperienceSearchInput {
+    query: String
+    minPrice: Float
+    maxPrice: Float
+    category: String
+    professionalTitle: String
+    groupSize: Int
+    minDuration: Int
+    minYearsOfExperience: Int
+    minRating: Float
+    startDate: String
+    endDate: String
+}
+
+type Query {
+  getExperience(id: ID!): Experience
+  getExperiences: [Experience!]!
+  getHostExperiences(host_id: ID!): [Experience!]!
+  getExperiencesPaginated(first: Int!, after: String): ExperienceConnection!
+  searchExperiences(input: ExperienceSearchInput, first: Int!, after: String): ExperienceConnection!
+}
+
+type Mutation {
+  createExperience(input: ExperienceInput!): Experience!
+  updateExperience(id: ID!, input: ExperienceInput!): Experience!
+  deleteExperience(id: ID!): Boolean!
+  generateCloudinarySignature: CloudinarySignature!
+}
+
+
+# type Address {
+#   id: ID!
+#   street: String!
+#   city: String!
+#   postal_code: String
+#   country: String!
+#   latitude: Float
+#   longitude: Float
+# }
+
+# type User {
+#   id: ID!
+#   name: String!
+#   uid: String!
+#   email: String!
+#   phone: String
+#   description: String
+#   created_at: String!
+#   address_id: ID
+#   address: Address
+# }
+
+# type ExperienceImage {
+#   id: ID!
+#   experience_id: ID!
+#   url: String!
+#   meta_data: String
+#   caption: String
+# }
+
+# type Experience {
+#   id: ID!
+#   host: User!
+#   host_id: ID!
+#   address: Address!
+#   address_id: ID!
+#   title: String!
+#   brief_bio: String!
+#   category: String!
+#   years_of_experience: Int!
+#   professional_title: String!
+#   price: Float!
+#   group_size_min: Int!
+#   group_size_max: Int!
+#   duration_minutes: Int!
+#   experience_overview: String!
+#   cancellation_policy: String
+#   status: String!
+#   images: [ExperienceImage!]!
+#   itineraries: [ExperienceItinerary!]!
+#   itinerary_days: [ItineraryDay!]!
+#   faqs: [ExperienceFAQ!]!
+#   bookings: [ExperienceBooking!]!
+#   reviews: [ExperienceReview!]!
+#   created_at: String!
+#   updated_at: String!
+# }
+
+# type ExperienceItinerary {
+#   id: ID!
+#   experience_id: ID!
+#   day: Int!
+#   description: String!
+#   start_time: String
+#   end_time: String
+# }
+
+# type ItineraryDay {
+#   id: ID!
+#   experience_id: ID!
+#   date: String!
+#   start_time: String
+#   end_time: String
+#   activities: [Activity!]!
+# }
+
+# type Activity {
+#   id: ID!
+#   itinerary_day_id: ID!
+#   title: String!
+#   description: String
+#   duration_minutes: Int
+#   thumbnail_url: String
+#   location: String
+# }
+
+# type ExperienceFAQ {
+#   id: ID!
+#   experience_id: ID!
+#   question: String!
+#   answer: String!
+#   created_at: String!
+# }
+
+# type ExperienceBooking {
+#   id: ID!
+#   experience_id: ID!
+#   user_id: ID!
+#   user: User!
+#   start_date: String!
+#   end_date: String!
+#   status: String!
+#   created_at: String!
+# }
+
+# type ExperienceReview {
+#   id: ID!
+#   experience_id: ID!
+#   user_id: ID!
+#   user: User!
+#   rating: Int!
+#   comment: String
+#   created_at: String!
+# }
+
+# type CloudinarySignature {
+#   signature: String!
+#   timestamp: String!
+#   cloudName: String!
+#   apiKey: String!
+# }
+
+# type ExperienceConnection {
+#   totalCount: Int!
+#   edges: [ExperienceEdge!]!
+#   pageInfo: PageInfo!
+# }
+
+# type ExperienceEdge {
+#   cursor: String!
+#   node: Experience!
+# }
+
+# type PageInfo {
+#   hasNextPage: Boolean!
+#   endCursor: String
+# }
+
+# input AddressInput {
+#   street: String!
+#   city: String!
+#   postal_code: String
+#   country: String!
+#   latitude: Float
+#   longitude: Float
+# }
+
+# input ExperienceInput {
+#   host_id: ID!
+#   address: AddressInput!
+#   title: String!
+#   brief_bio: String!
+#   category: String!
+#   years_of_experience: Int!
+#   professional_title: String!
+#   price: Float!
+#   group_size_min: Int!
+#   group_size_max: Int!
+#   duration_minutes: Int!
+#   experience_overview: String!
+#   cancellation_policy: String
+#   image_urls: [String!]!
+#   itineraries: [ExperienceItineraryInput!]!
+#   itinerary_days: [ItineraryDayInput!]!
+#   faqs: [ExperienceFAQInput!]!
+# }
+
+# input ExperienceItineraryInput {
+#   day: Int!
+#   description: String!
+#   start_time: String
+#   end_time: String
+# }
+
+# input ItineraryDayInput {
+#   date: String!
+#   start_time: String
+#   end_time: String
+#   activities: [ActivityInput!]!
+# }
+
+# input ActivityInput {
+#   title: String!
+#   description: String
+#   thumbnail_url: String
+#   duration_minutes: Int
+#   location: String
+# }
+
+# input ExperienceFAQInput {
+#   question: String!
+#   answer: String!
+# }
+
+# type Query {
+#   getExperience(id: ID!): Experience
+#   getExperiences: [Experience!]!
+#   getHostExperiences(host_id: ID!): [Experience!]!
+#   getExperiencesPaginated(first: Int!, after: String): ExperienceConnection!
+# }
+
+# type Mutation {
+#   createExperience(input: ExperienceInput!): Experience!
+#   updateExperience(id: ID!, input: ExperienceInput!): Experience!
+#   deleteExperience(id: ID!): Boolean!
+#   generateCloudinarySignature: CloudinarySignature!
+# }

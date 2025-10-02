@@ -1,0 +1,285 @@
+Folder PATH listing for volume MICHAEL BACKUP
+Volume serial number is 4839-20CF
+D:.
+|   .env
+|   .gitignore
+|   app.json
+|   eslint.config.js
+|   expo-env.d.ts
+|   file-structure.txt
+|   navigation.d.ts
+|   package-lock.json
+|   package.json
+|   README.md
+|   tsconfig.json
+|   
++---.expo
+|   |   devices.json
+|   |   README.md
+|   |   
+|   +---types
+|   |       navigation.d.ts
+|   |       router.d.ts
+|   |       
+|   \---web
+|       \---cache
+|           \---production
+|               \---images
+|                   +---android-adaptive-foreground
+|                   |   \---android-adaptive-foreground-5f4c0a732b6325bf4071d9124d2ae67e037cb24fcc9c482ef82bea742109a3b8-cover-transparent
+|                   |           icon_108.png
+|                   |           icon_162.png
+|                   |           icon_216.png
+|                   |           icon_324.png
+|                   |           icon_432.png
+|                   |           
+|                   +---android-standard-circle
+|                   |   \---android-standard-circle-5f4c0a732b6325bf4071d9124d2ae67e037cb24fcc9c482ef82bea742109a3b8-cover-#ffffff
+|                   |           icon_144.png
+|                   |           icon_192.png
+|                   |           icon_48.png
+|                   |           icon_72.png
+|                   |           icon_96.png
+|                   |           
+|                   +---android-standard-square
+|                   |   \---android-standard-square-5f4c0a732b6325bf4071d9124d2ae67e037cb24fcc9c482ef82bea742109a3b8-cover-#ffffff
+|                   |           icon_144.png
+|                   |           icon_192.png
+|                   |           icon_48.png
+|                   |           icon_72.png
+|                   |           icon_96.png
+|                   |           
+|                   \---splash-android
+|                       \---splash-android-5f4c0a732b6325bf4071d9124d2ae67e037cb24fcc9c482ef82bea742109a3b8-contain
+|                               icon_200.png
+|                               icon_300.png
+|                               icon_400.png
+|                               icon_600.png
+|                               icon_800.png
+|                               
++---.vscode
+|       settings.json
+|       
++---app
+|   |   +not-found.tsx
+|   |   index.tsx
+|   |   _layout.tsx
+|   |   
+|   +---(guest)
+|   |   |   _layout.tsx
+|   |   |   
+|   |   +---(auth)
+|   |   |       auth_form.tsx
+|   |   |       auth_page.tsx
+|   |   |       sign_in.tsx
+|   |   |       
+|   |   +---(modals)
+|   |   |   +---about
+|   |   |   |       [about].tsx
+|   |   |   |       
+|   |   |   +---auth_page
+|   |   |   +---base_search
+|   |   |   |       [query].tsx
+|   |   |   |       
+|   |   |   +---host_profile
+|   |   |   |       [host_profile].tsx
+|   |   |   |       
+|   |   |   \---reviews
+|   |   |           [modal].tsx
+|   |   |           
+|   |   \---(tabs)
+|   |       |   profile.tsx
+|   |       |   _layout.tsx
+|   |       |   
+|   |       +---home
+|   |       |   |   _layout.tsx
+|   |       |   |   
+|   |       |   +---(search)
+|   |       |   |       [query].tsx
+|   |       |   |       
+|   |       |   +---(toptabs)
+|   |       |   |       Experience.tsx
+|   |       |   |       HideIconContext.tsx
+|   |       |   |       Homes.tsx
+|   |       |   |       Services.tsx
+|   |       |   |       TobBarNavigator.tsx
+|   |       |   |       _layout.tsx       
+|   |       |               
+|   |       +---reservations
+|   |       |   |   [listing].tsx
+|   |       |   |   _layout.tsx
+|   |       |   |   
+|   |       |   \---(toptabs)
+|   |       |           HideIconContext.tsx
+|   |       |           Homes.tsx
+|   |       |           Smoi.tsx
+|   |       |           TobBarNavigator.tsx
+|   |       |           Upcoming.tsx
+|   |       |           _layout.tsx
+|   |       |           
+|   |       \---wishlists
+|   |               index.tsx
+|   |               _layout.tsx
+|   |               
+|   \---(host)
+|       |   _layout.tsx
+|       |   
+|       +---(auth)
+|       |       auth_form.tsx
+|       |       auth_page.tsx
+|       |       sign_in.tsx
+|       |       
+|       +---(modals)
+|       |   +---about
+|       |   |       [about].tsx
+|       |   |       
+|       |   +---auth_page
+|       |   +---host_profile
+|       |   |       [host_profile].tsx
+|       |   |       
+|       |   \---reviews
+|       |           [modal].tsx
+|       |           
+|       \---(tabs)
+|           |   profile.tsx
+|           |   _layout.tsx
+|           |   
+|           +---home
+|           |   |   [listing].tsx
+|           |   |   _layout.tsx
+|           |   |   
+|           |   \---(toptabs)
+|           |           HideIconContext.tsx
+|           |           Homes.tsx
+|           |           TobBarNavigator.tsx
+|           |           Upcoming.tsx
+|           |           _layout.tsx
+|           |           
+|           \---listing
+|               |   index.tsx
+|               |   start.tsx
+|               |   _layout.tsx
+|               |   
+|               +---experiences
+|               |       amenities.tsx
+|               |       landing.tsx
+|               |       location.tsx
+|               |       specialize.tsx
+|               |       title_description.tsx
+|               |       upload_media.tsx
+|               |       _layout.tsx
+|               |       
+|               +---homes
+|               |       amenities.tsx
+|               |       landing.tsx
+|               |       location.tsx
+|               |       specialize.tsx
+|               |       title_description.tsx
+|               |       upload_media.tsx
+|               |       _layout.tsx
+|               |       
+|               \---services
+|                       amenities.tsx
+|                       landing.tsx
+|                       location.tsx
+|                       specialize.tsx
+|                       title_description.tsx
+|                       upload_media.tsx
+|                       _layout.tsx
+|                       
++---assets
+|   +---fonts
+|   |       SpaceMono-Regular.ttf
+|   |       
+|   \---images
+|           adaptive-icon.png
+|           background-small.png
+|           background.png
+|           book.png
+|           building.png
+|           calendar.png
+|           comprehensive-rust.pdf
+|           customer-service.png
+|           download (1).jpeg
+|           download.jpeg
+|           favicon.png
+|           guest-avatar.jpg
+|           host-avatar.jpg
+|           icon.png
+|           image.png
+|           image3.jpg
+|           kitchen-white-gloss-interior.jpg
+|           living-room.jpg
+|           map.jpg
+|           partial-react-logo.png
+|           react-logo.png
+|           react-logo@2x.png
+|           react-logo@3x.png
+|           resort.png
+|           review-avatar.jpg
+|           rustconf-2025-reg_p6TVQtDTEpsuRwbPldeNSSA-tickets.pdf
+|           screen.jpeg
+|           splash-icon.png
+|           test.jpeg
+|           
++---components
+|   |   Collapsible.tsx
+|   |   ExternalLink.tsx
+|   |   HapticTab.tsx
+|   |   HelloWave.tsx
+|   |   ParallaxScrollView.tsx
+|   |   ThemedText.tsx
+|   |   ThemedView.tsx
+|   |   
+|   \---ui
+|           FormField.tsx
+|           Header.tsx
+|           Icons.tsx
+|           IconSymbol.ios.tsx
+|           IconSymbol.tsx
+|           ImageCarousel.tsx
+|           ImageModal.tsx
+|           Line.tsx
+|           PreviousNextUI.tsx
+|           ScreenModal.tsx
+|           TabBarBackground.ios.tsx
+|           TabBarBackground.tsx
+|           test.tsx
+|           
++---constants
+|   |   Colors.ts
+|   |   queries.ts
+|   |   
+|   \---graphql
+|       |   booking.graphql
+|       |   index.ts
+|       |   message.graphql
+|       |   property.graphql
+|       |   review.graphql
+|       |   user.graphql
+|       |   
+|       +---New folder
+|       \---resolvers
+|               booking.ts
+|               index.ts
+|               message.ts
+|               property.ts
+|               review.ts
+|               user.ts
+|               
++---context
+|       ctx.tsx
+|       formContext.tsx
+|       
++---hooks
+|       useColorScheme.ts
+|       useColorScheme.web.ts
+|       useStorageState.ts
+|       useThemeColor.ts
+|       
++---lib
+|       apolloClient.ts
+|       appwrite.js
+|       constants.ts
+|       useAppwrite.js
+|       

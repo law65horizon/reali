@@ -1,0 +1,28 @@
+# src/graphql/schema/booking.graphql
+type Booking {
+  id: ID!
+  property: Property!
+  user: User!
+  startDate: String!
+  endDate: String!
+  status: String!
+  createdAt: String!
+}
+
+input BookingInput {
+  propertyId: ID!
+  userId: ID!
+  startDate: String!
+  endDate: String!
+}
+
+type Query {
+  getBooking(id: ID!): Booking
+  getBookings: [Booking!]!
+}
+
+type Mutation {
+  createBooking(input: BookingInput!): Booking!
+  updateBooking(id: ID!, status: String!): Booking!
+  deleteBooking(id: ID!): Boolean!
+}

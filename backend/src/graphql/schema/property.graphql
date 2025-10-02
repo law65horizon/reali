@@ -1,0 +1,289 @@
+# Updated property.graphql
+type Address {
+    id: ID!
+    street: String!
+    city: String!
+    postal_code: String
+    country: String!
+    latitude: Float
+    longitude: Float
+}
+
+type Image {
+  id: ID!
+  property_id: ID!
+  url: String!
+  meta_data: String
+  caption: String
+}
+
+type User {
+  id: ID!
+  name: String!
+  uid: String!
+  email: String!
+  phone: String
+  description: String
+  created_at: String!
+  address_id: ID
+  address: Address
+}
+
+type Property {
+    id: ID!
+    realtor: User!
+    realtor_id: ID!
+    address: Address
+    address_id: ID
+    title: String
+    speciality: String
+    amenities: [String!]!
+    price: Float
+    images: [Image!]!
+    description: String
+    status: String!
+    created_at: String!
+    updated_at: String!
+    bookings: [PropertyBooking!]!
+    reviews: [PropertyReview!]!
+}
+
+type PropertyBooking {
+    id: ID!
+    property_id: ID!
+    user_id: ID!
+    user: User!
+    start_date: String!
+    end_date: String!
+    status: String!
+    created_at: String!
+}
+
+type PropertyReview {
+    id: ID!
+    property_id: ID!
+    user_id: ID!
+    user: User!
+    rating: Int!
+    comment: String
+    created_at: String!
+}
+
+type PropertyEdge {
+    node: Property!
+    cursor: String!
+}
+
+type PropertyConnection {
+    edges: [PropertyEdge!]!
+    pageInfo: PageInfo!
+    totalCount: Int!
+}
+
+type PageInfo {
+    hasNextPage: Boolean!
+    endCursor: String
+}
+
+type PropertyWithRealtor {
+    id: ID!
+    address: Address
+    realtor_id: ID!
+    price: Float
+    description: String
+    realtor: User!
+}
+
+input PropertyInput {
+    realtor_id: ID!
+    address: AddressInput!
+    title: String
+    speciality: String
+    amenities: [String!]!
+    price: Float
+    image_urls: [String!]!
+    description: String
+    status: String
+}
+
+input AddressInput {
+    street: String!
+    city: String!
+    postal_code: String
+    country: String!
+    longitude: Float
+    latitude: Float
+}
+
+input PropertySearchInput {
+    query: String
+    minPrice: Float
+    maxPrice: Float
+    speciality: String
+    amenities: [String!]
+    startDate: String
+    endDate: String
+    minRating: Float
+}
+
+type CloudinarySignature {
+  signature: String!
+  timestamp: String!
+  cloudName: String!
+  apiKey: String!
+}
+
+type Query {
+    getProperty(id: ID!): Property
+    getProperties(first: Int!, after: String): PropertyConnection!
+    searchProperties(input: PropertySearchInput, first: Int!, after: String): PropertyConnection!
+    getListings(realtor_id: ID!): [Property!]!
+}
+
+type Mutation {
+    createProperty(input: PropertyInput!): Property!
+    updateProperty(id: ID!, input: PropertyInput!): Property!
+    publishProperty(id: ID!): Property!
+    archiveProperty(id: ID!): Property!
+    deleteProperty(id: ID!): Boolean!
+    generateCloudinarySignature: CloudinarySignature!
+}
+
+
+# type Address {
+#     id: ID!
+#     street: String!
+#     city: String!
+#     postal_code: String
+#     country: String!
+#     latitude: Float
+#     longitude: Float
+# }
+
+# type Image {
+#   id: ID!
+#   property_id: ID!
+#   url: String!
+#   meta_data: String
+#   caption: String
+# }
+
+# type User {
+#   id: ID!
+#   name: String!
+#   uid: String!
+#   email: String!
+#   phone: String
+#   description: String
+#   created_at: String!
+#   address_id: ID
+#   address: Address
+# }
+
+# type Property {
+#     id: ID!
+#     realtor: User!
+#     realtor_id: ID!
+#     address: Address
+#     address_id: ID
+#     title: String
+#     speciality: String
+#     amenities: [String!]!
+#     price: Float
+#     images: [Image!]!
+#     description: String
+#     status: String!
+#     created_at: String!
+#     updated_at: String!
+#     bookings: [PropertyBooking!]!
+#     reviews: [PropertyReview!]!
+# }
+
+# type PropertyBooking {
+#     id: ID!
+#     property_id: ID!
+#     user_id: ID!
+#     user: User!
+#     start_date: String!
+#     end_date: String!
+#     status: String!
+#     created_at: String!
+# }
+
+# type PropertyReview {
+#     id: ID!
+#     property_id: ID!
+#     user_id: ID!
+#     user: User!
+#     rating: Int!
+#     comment: String
+#     created_at: String!
+# }
+
+# type PropertyEdge {
+#     node: Property!
+#     cursor: String!
+# }
+
+# type PropertyConnection {
+#     edges: [PropertyEdge!]!
+#     pageInfo: PageInfo!
+#     totalCount: Int!
+# }
+
+# type PageInfo {
+#     hasNextPage: Boolean!
+#     endCursor: String
+# }
+
+# type PropertyWithRealtor {
+#     id: ID!
+#     address: Address
+#     realtor_id: ID!
+#     price: Float
+#     description: String
+#     realtor: User!
+# }
+
+# input PropertyInput {
+#     realtor_id: ID!
+#     address: AddressInput!
+#     title: String
+#     speciality: String
+#     amenities: [String!]!
+#     price: Float
+#     image_urls: [String!]!
+#     description: String
+#     status: String
+# }
+
+# input AddressInput {
+#     street: String!
+#     city: String!
+#     postal_code: String
+#     country: String!
+#     longitude: Float
+#     latitude: Float
+# }
+
+# type CloudinarySignature {
+#   signature: String!
+#   timestamp: String!
+#   cloudName: String!
+#   apiKey: String!
+# }
+
+# type Query {
+#     getProperty(id: ID!): Property
+#     getProperties(first: Int!, after: String): PropertyConnection!
+#     getListings(realtor_id: ID!): [Property!]!
+# }
+
+# type Mutation {
+#     createProperty(input: PropertyInput!): Property!
+#     updateProperty(id: ID!, input: PropertyInput!): Property!
+#     publishProperty(id: ID!): Property!
+#     archiveProperty(id: ID!): Property!
+#     deleteProperty(id: ID!): Boolean!
+#     generateCloudinarySignature: CloudinarySignature!
+# }
