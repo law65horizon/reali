@@ -1,19 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Dimensions,
-  FlatList,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Dimensions,
+    FlatList,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import PreviousNextUI from '@/components/ui/PreviousNextUI';
-import { useHomeStore } from '@/store/homeStore';
+import { useHomeStore } from '@/stores/homeStore';
 import { useTheme } from '@/theme/theme';
 import { router } from 'expo-router';
 

@@ -1,3 +1,4 @@
+import { USE_MOCK } from '@/lib/constants';
 import { GET_EXPERIENCES_PAGINATED } from '@/queries/experience';
 import { GET_PROPERTIES } from '@/queries/properties';
 import { useQuery } from '@apollo/client';
@@ -16,9 +17,9 @@ function returnQuery(type: DataType) {
 export const useSectionedExperiences = (query?: any) => {
   const { data, loading, error, fetchMore, networkStatus } = useQuery(GET_EXPERIENCES_PAGINATED, {
     variables: { first: 10, input: {query} },
-    // variables: { first: 10, input: {maxPrice: query?.maxPrice, minPrice: query?.minPrice} },
     notifyOnNetworkStatusChange: true,
     fetchPolicy: 'cache-and-network',
+    skip: USE_MOCK,
   });
 
   console.log(loading, error, data)
@@ -70,8 +71,29 @@ export const useSectionedExperiences = (query?: any) => {
     }
   }, [data]);
 
+  if (USE_MOCK) {
+    const mockEdges = Array.from({ length: 10 }).map((_, i) => ({
+      node: {
+        id: `mock-exp-${i+1}`,
+        title: `Guided Tour #${i+1}`,
+        price: 30 + i * 3,
+        address: { city: ['Paris','New York','Madrid','Berlin'][i % 4] },
+        images: [{ url: 'https://via.placeholder.com/300x200.png?text=Experience' }],
+        reviews: [{ rating: 4.7 }],
+        category: 'experience',
+      }
+    }));
+    return {
+      sections: groupByCity(mockEdges as any),
+      loading: false,
+      error: null,
+      loadMore: () => {},
+      hasNextPage: false,
+      networkStatus: 7,
+    };
+  }
+
   return {
-    // sections: data?.searchExperiences?.edges ? data.searchExperiences.edges.map((edge: any) => edge.node) : [],
     sections: data?.searchExperiences?.edges ? groupByCity(data.searchExperiences.edges) : [],
     loading,
     error: error ? error.message : null,
@@ -129,6 +151,7 @@ export const useExperiences = (query: ExperienceQueryInput) => {
       },
       notifyOnNetworkStatusChange: true,
       fetchPolicy: 'cache-and-network',
+      skip: USE_MOCK,
     }
   );
 
@@ -168,6 +191,27 @@ export const useExperiences = (query: ExperienceQueryInput) => {
       console.log('Experience IDs:', ids);
     }
   }, [data, dataKey]);
+
+  if (USE_MOCK) {
+    const list = Array.from({ length: 12 }).map((_, i) => ({
+      id: `${query?.type === 'properties' ? 'mock-prop' : 'mock-exp'}-${i+1}`,
+      title: query?.type === 'properties' ? `Modern Apartment #${i+1}` : `Guided Tour #${i+1}`,
+      price: query?.type === 'properties' ? 80 + i * 5 : 30 + i * 3,
+      address: { city: ['Paris','New York','Madrid','Berlin'][i % 4], country: ['FR','US','ES','DE'][i % 4] },
+      images: [{ url: 'https://via.placeholder.com/300x200.png?text=' + (query?.type === 'properties' ? 'Home' : 'Experience') }],
+      reviews: [{ rating: 4.6 }],
+      category: query?.type,
+    }));
+
+    return {
+      data: list,
+      loading: false,
+      error: null,
+      loadMore: () => {},
+      hasNextPage: false,
+      networkStatus: 7,
+    };
+  }
 
   return {
     data: data?.[dataKey]?.edges ? data[dataKey].edges.map((edge: any) => edge.node) : [],

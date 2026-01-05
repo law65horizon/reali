@@ -1,34 +1,27 @@
 // SignUpScreen.js
 import { ThemedText } from '@/components/ThemedText';
 import FormField from '@/components/ui/FormField';
-import { useSession } from '@/context/ctx';
 import { useTheme } from '@/theme/theme';
 import { gql, useMutation } from '@apollo/client';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { router, useNavigation } from 'expo-router';
 import React, { useState } from 'react';
 // import {} from '@/constants/graphql/'
+import { SEND_VERIFICATION_CODE, VERIFY_CODE } from '@/graphql/mutations';
+import { useAuthStore } from '@/stores/authStore';
 import {
   ActivityIndicator,
   Alert,
   Platform,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
-import { createUser } from '../../../lib/appwrite';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-// input UserInput {
-//   name: String!
-//   email: String!
-//   uid: String!
-//   password: String!
-//   phone: String
-//   description: String
-// }
 
 export default function SignUpScreen() {
   const CREATE_USER = gql`
@@ -47,12 +40,11 @@ export default function SignUpScreen() {
   const [lastName, setLastName] = useState('');
   const [dob, setDob] = useState<any>(null);
   const [showDobPicker, setShowDobPicker] = useState(false);
-  const [email, setEmail] = useState('');
+  const [emaile, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false)
   const navigation = useNavigation() 
   const {theme} = useTheme()
-  const { signIn } = useSession()
-  const [createUserData, { data, loading, error }] = useMutation(CREATE_USER)
+  // const [createUserData, { data, loading, error }] = useMutation(CREATE_USER)
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -66,6 +58,67 @@ export default function SignUpScreen() {
     email: false,
   });
 
+  const [step, setStep] = useState('email');
+  const [code, setCode] = useState('');
+
+
+  const { setAuth } = useAuthStore();
+    
+    const [sendCode, { loading: sendingCode }] = useMutation(SEND_VERIFICATION_CODE);
+    const [verifyCode, { loading: verifying }] = useMutation(VERIFY_CODE);
+  
+    const handleSendCode = async () => {
+      if (!form.email.trim()) {
+        Alert.alert('Error', 'Please enter your form.');
+        return;
+      }
+  
+      try {
+        const { data } = await sendCode({ variables: { email: form.email.toLowerCase().trim() } });
+        
+        if (data.sendVerificationCode.success) {
+          setStep('code');
+          Alert.alert('Success', data.sendVerificationCode.message);
+          
+          // Log preview URL in development
+          if (data.sendVerificationCode.previewUrl) {
+            console.log('Email Preview:', data.sendVerificationCode.previewUrl);
+          }
+        }
+      } catch (error:any) {
+        Alert.alert('Error', error.message);
+      }
+    };
+  
+    const handleVerifyCode = async () => {
+      if (code.length !== 6) {
+        Alert.alert('Error', 'Please enter the 6-digit code');
+        return;
+      }
+  
+      try {
+        const { data } = await verifyCode({ 
+          variables: { input: 
+            {email: form.email.toLowerCase().trim(), code, } 
+          } 
+        });
+  
+        await setAuth(
+          data.verifyCode.accessToken,
+          data.verifyCode.refreshToken,
+          data.verifyCode.user,
+          'guest'
+        );
+
+        router.dismissAll()
+  
+        // Navigation will be handled by auth state change
+      } catch (error:any) {
+        Alert.alert('Error', error.message);
+        setCode('');
+      }
+    };
+
   const onChangeDob = (event:any, selectedDate:any) => {
     setShowDobPicker(Platform.OS === 'ios');
     if (selectedDate) setDob(selectedDate);
@@ -73,54 +126,60 @@ export default function SignUpScreen() {
 
   const errors = {
     dob: touched.dob && !dob ? 'Date of birth is required' : '',
-    email: touched.email && !email ? 'Email is required' : '',
+    email: touched.email && !form.email ? 'Email is required' : '',
   };
 
-  const onSubmit = async () => {
-    setTouched({ dob: true, email: true });
-    if ( !form.email) {
-        Alert.alert("Error", "Please fill in all fields");
-        return
-    }
-    if (isSubmitting) return
-    setIsSubmitting(true)
-    try {
-        const username = form.firstName+ ' ' + form.lastName
-        const result = await createUser(form.email, form.password, username)
-
-        const response = await createUserData({
-          variables: {
-            input: {
-              name: username,
-              email: form.email,
-              uid: result.uid,
-              password: form.password,
-              phone: form.phone || null, // Optional field
-            },
-          }
-        })
-        if(error) {
-          throw new Error(error.message)
-        }
-
-        signIn({uid: result.uid, mode: 'guest'})
-        if(navigation.canGoBack()){
-          navigation.goBack()
-          // navigation.goBack()
-          // navigation.pop(2)
-        }else router.replace('/(guest)/(tabs)/home/(toptabs)/Homes')
-    } catch (error:any) {
-        Alert.alert('Error', error.message)
-    } finally {
-      setIsSubmitting(false)
-    }
-  };
+  if (step === 'code') {
+    return (
+        <View style={styles.container}>
+          <Text style={styles.title}>Enter Code</Text>
+          <Text style={styles.subtitle}>
+            We sent a verification code to{'\n'}{form.email}
+          </Text>
+          
+          <TextInput
+            style={[styles.input, styles.codeInput]}
+            placeholder="000000"
+            value={code}
+            onChangeText={setCode}
+            keyboardType="number-pad"
+            maxLength={6}
+            editable={!verifying}
+          />
+    
+          <TouchableOpacity 
+            style={[styles.button, verifying && styles.buttonDisabled]}
+            onPress={handleVerifyCode}
+            disabled={verifying}
+          >
+            {verifying ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Verify & Login</Text>
+            )}
+          </TouchableOpacity>
+    
+          <TouchableOpacity 
+            onPress={() => setStep('email')}
+            style={styles.backButton}
+          >
+            <Text style={styles.backButtonText}>Change Email</Text>
+          </TouchableOpacity>
+    
+          <TouchableOpacity 
+            onPress={handleSendCode}
+            disabled={sendingCode}
+          >
+            <Text style={styles.resendText}>Resend Code</Text>
+          </TouchableOpacity>
+        </View>
+      );
+  }
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.colors.backgroundSec}]}>
-      <ScrollView contentContainerStyle={styles.inner}>
-        {/* Header */}
-        <View style={[styles.header, {marginBottom: 14}]}>
+      {/* Header */}
+        <View style={[styles.header, {paddingHorizontal: 16, paddingTop: 20}]}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <ThemedText style={styles.backArrow}>‹</ThemedText>
           </TouchableOpacity>
@@ -128,6 +187,8 @@ export default function SignUpScreen() {
             <ThemedText type='defaultSemiBold' style={styles.title}>Finish signing up</ThemedText>
           </View>
         </View>
+      <ScrollView contentContainerStyle={styles.inner}>
+        
 
         {/* Legal name */}
         <ThemedText style={styles.label}>Legal name</ThemedText>
@@ -247,7 +308,7 @@ export default function SignUpScreen() {
         </Text>
 
         {/* Button */}
-        <TouchableOpacity style={[styles.button, {backgroundColor: theme.colors.background}]} onPress={onSubmit}>
+        <TouchableOpacity style={[styles.button, {backgroundColor: theme.colors.background}]} onPress={handleSendCode}>
           {!isSubmitting ?
             <ThemedText type='defaultSemiBold' >Agree and continue</ThemedText>
             : <ActivityIndicator 
@@ -313,4 +374,40 @@ const styles = StyleSheet.create({
   },
   // buttonText: { color: '#FFF', fontSize: 16, fontWeight: '600' },
   footer: { fontSize: 12, color: '#777', marginTop: 24, lineHeight: 18 },
+
+  subtitle: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginBottom: 30,
+  },
+  codeInput: {
+    fontSize: 32,
+    letterSpacing: 10,
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  backButton: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  backButtonText: {
+    color: '#2563eb',
+    fontSize: 16,
+  },
+  resendText: {
+    color: '#6b7280',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 10,
+    textDecorationLine: 'underline',
+  },
 });
+

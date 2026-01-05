@@ -1,7 +1,7 @@
 import { ThemedView } from '@/components/ThemedView';
 import InputField from '@/components/ui/InputField';
 import PreviousNextUI from '@/components/ui/PreviousNextUI';
-import { useExperienceStore } from '@/store/experienceStore';
+import { useExperienceStore } from '@/stores/experienceStore';
 import { useTheme } from '@/theme/theme';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';

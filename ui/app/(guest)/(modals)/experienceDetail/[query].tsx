@@ -1,544 +1,859 @@
 import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
 import { Line } from '@/components/ui/Line';
+import AmenitiesModal from '@/components/ui/PropertiesFeatures';
 import StarRating from '@/components/ui/StarRating';
+import { ErrorState } from '@/components/ui/StateComponents';
+import { useGetProperty } from '@/hooks/useSearchProp';
+import { useFavoritesStore } from '@/stores';
 import { useTheme } from '@/theme/theme';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Image, ImageStyle } from 'expo-image';
-import { useLocalSearchParams, useNavigation } from 'expo-router';
-import { MapPin } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { formatDate, timeDifference } from '@/utils/formatDate';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useCallback, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
-  DimensionValue,
-  FlatList,
+  Image,
   ScrollView,
+  Share,
+  StatusBar,
   StyleSheet,
+  Text,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
 
-// Types based on DB schema
-interface Address {
-  id: number;
-  street: string;
-  city: { id: number; name: string; country: { id: number; name: string; code: string } };
-  postal_code?: string;
-  latitude?: number;
-  longitude?: number;
-}
+const { width, height } = Dimensions.get('window');
 
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  description?: string;
-  phone?: string;
-  address_id?: number;
-}
-
-interface ExperienceImage {
-  id: number;
-  url: string;
-  caption?: string;
-}
-
-interface ExperienceItinerary {
-  id: number;
-  day: number;
-  description: string;
-  start_time?: string;
-  end_time?: string;
-  activity?: Activity[]
-}
-
-interface Activity {
-  id: number;
-  title: string;
-  description?: string;
-  duration_minutes?: number;
-  thumbnail_url?: string;
-  location?: string;
-}
-
-interface ExperienceFAQ {
-  id: number;
-  question: string;
-  answer: string;
-}
-
-interface ExperienceReview {
-  id: number;
-  user: { id: number; name: string };
-  rating: number;
-  comment?: string;
-  created_at: string;
-}
-
-interface Experience {
-  id: number;
-  host: User;
-  title: string;
-  brief_bio: string;
-  category: string;
-  years_of_experience: number;
-  professional_title: string;
-  price: number;
-  group_size_min: number;
-  group_size_max: number;
-  duration_minutes: number;
-  experience_overview: string;
-  cancellation_policy?: string;
-  address: Address;
-  images: ExperienceImage[];
-  itineraries: ExperienceItinerary[];
-  faqs: ExperienceFAQ[];
-  reviews: ExperienceReview[];
-}
-
-// Mock data (replace with API call in production)
-const mockExperience: Experience = {
-  id: 1,
-  host: {
-    id: 1,
-    name: 'Jane Doe',
-    email: 'jane@example.com',
-    description: 'Passionate local guide with 10 years of experience.',
-  },
-  title: 'Culinary Tour of Lagos',
-  brief_bio: 'Expert chef and food historian',
-  category: 'Food & Drink',
-  years_of_experience: 10,
-  professional_title: 'Chef & Guide',
-  price: 75.0,
-  group_size_min: 2,
-  group_size_max: 8,
-  duration_minutes: 180,
-  experience_overview: 'Explore the vibrant food scene of Lagos with a local chef...',
-  cancellation_policy: 'Free cancellation up to 48 hours before the event.',
-  address: {
-    id: 1,
-    street: '123 Market Street',
-    city: { id: 1, name: 'Lagos', country: { id: 1, name: 'Nigeria', code: 'NG' } },
-    latitude: 6.5244,
-    longitude: 3.3792,
-  },
+const propertyData = {
   images: [
-    { id: 1, url: require('@/assets/images/image.png'), caption: 'Local market' },
-    { id: 2, url: require('@/assets/images/image.png'), caption: 'Cooking class' },
-    { id: 3, url: require('@/assets/images/image.png'), caption: 'Food tasting' },
-    { id: 4, url: require('@/assets/images/image.png'), caption: 'Group dining' },
+    'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800',
+    'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800',
+    'https://images.unsplash.com/photo-1600607687644-c7171b42498b?w=800',
+    'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=800',
   ],
-  itineraries: [
-    {
-      id: 1,
-      day: 1,
-      description: 'Visit Lekki Market to discover fresh local ingredients.',
-      start_time: '09:00',
-      end_time: '11:00',
-      activity: [
-        {
-          id: 1,
-          title: 'Market Tour',
-          description: 'Guided tour through Lekki Market to learn about spices and produce.',
-          duration_minutes: 90,
-          thumbnail_url: 'https://example.com/images/market-tour.jpg',
-          location: 'Lekki Market, Lagos',
-        },
-        {
-          id: 2,
-          title: 'Ingredient Selection',
-          description: 'Select fresh ingredients with the chef’s guidance.',
-          duration_minutes: 30,
-          thumbnail_url: 'https://example.com/images/ingredient-selection.jpg',
-          location: 'Lekki Market, Lagos',
-        },
-      ],
-    },
-    {
-      id: 2,
-      day: 1,
-      description: 'Hands-on cooking class to prepare authentic Nigerian dishes.',
-      start_time: '11:30',
-      end_time: '13:00',
-      activity: [
-        {
-          id: 3,
-          title: 'Cooking Egusi Soup',
-          description: 'Learn to cook traditional Egusi soup with local techniques.',
-          duration_minutes: 60,
-          thumbnail_url: 'https://example.com/images/egusi-soup.jpg',
-          location: 'Chef’s Kitchen Studio, Lagos',
-        },
-        {
-          id: 4,
-          title: 'Jollof Rice Masterclass',
-          description: 'Master the art of Nigerian jollof rice.',
-          duration_minutes: 30,
-          thumbnail_url: 'https://example.com/images/jollof-rice.jpg',
-          location: 'Chef’s Kitchen Studio, Lagos',
-        },
-      ],
-    },
-    {
-      id: 3,
-      day: 1,
-      description: 'Enjoy a communal dining experience with your creations.',
-      start_time: '13:30',
-      end_time: '14:30',
-      activity: [
-        {
-          id: 5,
-          title: 'Group Dining',
-          description: 'Savor your dishes with the group and share stories.',
-          duration_minutes: 60,
-          thumbnail_url: 'https://example.com/images/group-dining.jpg',
-          location: 'Chef’s Kitchen Studio, Lagos',
-        },
-      ],
-    },
-  ],
-  faqs: [
-    {
-      id: 1,
-      question: 'What should I bring to the tour?',
-      answer: 'Wear comfortable shoes, bring a reusable water bottle, and come with an appetite!',
-    },
-    {
-      id: 2,
-      question: 'Is the tour suitable for children?',
-      answer: 'Yes, children above 10 are welcome, but please inform us in advance.',
-    },
-    {
-      id: 3,
-      question: 'Are dietary restrictions accommodated?',
-      answer: 'Absolutely, please notify us of any dietary needs at least 48 hours in advance.',
-    },
+  title: 'Modern Downtown Loft',
+  type: 'Entire home',
+  rating: 4.9,
+  reviewCount: 127,
+  beds: 2,
+  bathrooms: 2,
+  guests: 4,
+  price: 180,
+  location: 'Downtown Los Angeles, CA',
+  host: {
+    name: 'Sarah Johnson',
+    image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
+    joined: 'Joined in 2019',
+    verified: true,
+  },
+  description: 'Welcome to this stunning modern loft in the heart of downtown! This beautifully designed space features floor-to-ceiling windows with breathtaking city views, an open-concept living area, and high-end finishes throughout.\n\nThe space is perfect for professionals, couples, or small families looking to experience the vibrant city life. You\'ll be within walking distance of world-class restaurants, entertainment venues, and cultural attractions.',
+  amenities: [
+    { icon: 'wifi', name: 'WiFi', type: 'MaterialIcons' },
+    { icon: 'kitchen', name: 'Kitchen', type: 'MaterialIcons' },
+    { icon: 'ac-unit', name: 'Air conditioning', type: 'MaterialIcons' },
+    { icon: 'tv', name: 'TV', type: 'MaterialIcons' },
+    { icon: 'local-parking', name: 'Free parking', type: 'MaterialIcons' },
+    { icon: 'pool', name: 'Pool', type: 'MaterialIcons' },
+    { icon: 'fitness-center', name: 'Gym', type: 'MaterialIcons' },
+    { icon: 'elevator', name: 'Elevator', type: 'MaterialIcons' },
   ],
   reviews: [
     {
-      id: 1,
-      user: { id: 2, name: 'John Smith' },
+      user: 'Michael Chen',
       rating: 5,
-      comment: 'An incredible experience! Jane’s knowledge of Nigerian cuisine is unmatched.',
-      created_at: '2025-08-01T12:00:00Z',
+      date: 'March 2024',
+      comment: 'Absolutely loved our stay! The location was perfect and the apartment exceeded our expectations.',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200',
     },
     {
-      id: 2,
-      user: { id: 3, name: 'Aisha Bello' },
-      rating: 4,
-      comment: 'Loved the cooking class, though the market was a bit crowded.',
-      created_at: '2025-08-15T14:30:00Z',
-    },
-    {
-      id: 3,
-      user: { id: 4, name: 'Michael Chen' },
+      user: 'Emma Rodriguez',
       rating: 5,
-      comment: 'Best food tour I’ve ever done. Highly recommend!',
-      created_at: '2025-09-01T09:00:00Z',
+      date: 'February 2024',
+      comment: 'Beautiful space with amazing views. Sarah was a wonderful host and very responsive.',
+      avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200',
     },
+  ],
+  rules: [
+    'Check-in: After 3:00 PM',
+    'Checkout: 11:00 AM',
+    'No smoking',
+    'No pets',
+    'No parties or events',
+    'Suitable for children and infants',
   ],
 };
 
-// ImageCarousel Component (reused from previous conversation)
-interface CarouselProps {
-  images: string[];
-  width?: DimensionValue;
-  imageHeight?: DimensionValue;
-  showNumber?: boolean;
-  modal?: boolean;
-  style?: ImageStyle;
-  uri?: boolean;
-}
-
-
-const { width } = Dimensions.get('window');
-
-// ExperienceDetailScreen Component
-const ExperienceDetailScreen = () => {
+const PropertyDetailsScreen = () => {
   const { theme } = useTheme();
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const [experience, setExperience] = useState<Experience | null>(null);
+  const {query} = useLocalSearchParams()
+  const colors = theme.colors;
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [showAllAmenities, setShowAllAmenities] = useState(false);
+  const scrollViewRef = useRef(null);
   const navigation = useNavigation()
-  const [collapsedSections, setCollapsedSections] = useState({
-    overview: true,
-    itinerary: true,
-    faqs: true,
-  });
+  const [amenitiesModal, showAmenitiesModal] = useState(false)
+  const { toggleFavorite, isFavorite } = useFavoritesStore();  
 
-  // Simulate fetching data based on id (replace with API call)
-  useEffect(() => {
-    // Fetch experience data using id
-    setExperience(mockExperience); // Replace with API call
-  }, [id]);
+  // console.log({query})
+  const {data, loading, error, refetch} = useGetProperty(parseInt(`${query}`))
+  // const [isFav, setFav] = useState(isFavorite(data?.id))
+  const isFav = () => isFavorite(data?.id);
 
-  if (!experience) {
-    return <ThemedView style={styles.container}><ThemedText>Loading...</ThemedText></ThemedView>;
-  }
 
-  const toggleSection = (section: keyof typeof collapsedSections) => {
-    setCollapsedSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  const handleToggleFavorite = useCallback(() => {
+    toggleFavorite(data?.id);
+  }, [data?.id, toggleFavorite]);
+
+  
+  console.log({data: data?.property?.realtor.created_at})
+  // console.log({p: property.amenities, error})
+
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Check out this amazing property: ${propertyData.title}`,
+      });
+    } catch (error) {
+      console.log(error);
+    }
   };
 
-  const averageRating = experience.reviews.length
-    ? (experience.reviews.reduce((sum, review) => sum + review.rating, 0) / experience.reviews.length).toFixed(1)
-    : 'No reviews';
+  const renderStars = (rating:any) => {
+    return [...Array(5)].map((_, i) => (
+      <Ionicons
+        key={i}
+        name={i < Math.floor(rating) ? 'star' : 'star-outline'}
+        size={14}
+        color={colors.warning || '#F59E0B'}
+      />
+    ));
+  };
 
-    // return(
-    //   <Appss />
-    // )
-  return (
-    <ThemedView style={{flex:1, paddingTop: 50, paddingHorizontal: 16, }}>
-      <View style={{flexDirection: 'row', alignItems:'center', justifyContent: 'space-between', paddingBottom: 5, borderBottomWidth: 1, borderColor: theme.colors.border}}>
-        <TouchableOpacity onPress={() => {if (navigation.canGoBack()) navigation.goBack()}} style={{zIndex:10}}>
-          <Ionicons name='arrow-back' color={theme.colors.text} size={30} />
-        </TouchableOpacity>
-        <ThemedText style={{ zIndex: 1,flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '600', position: 'absolute', width: width-32, }}> {mockExperience.category} in Taulser </ThemedText>
-        <View style={{flexDirection: 'row', gap: 10, alignItems: 'center'}}>
-          <Ionicons name='share-outline' color={theme.colors.text} size={28} />
-          <Ionicons name={true ? 'heart' : 'heart-outline'} color={theme.colors.primary} size={28} />
-        </View>
+  if (!loading && (error || !data)) {
+    return <ErrorState onRetry={refetch} retryText='Refetch'/>
+  }
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
+    );
+  }  
+  // const isFav = () => isFavorite(data?.id);
 
-      <ScrollView style={{paddingTop: 5,}} contentContainerStyle={{paddingBottom: 50}} showsVerticalScrollIndicator={false}>
-        <View style={{gap: 3, paddingBottom: 10}}>
-          <Image
-            source={{uri: 'https://res.cloudinary.com/dajzo2zpq/image/upload/v1752247182/properties/wlf2uijbultztvqptnka.jpg'}}
-            style={{width: '100%', borderTopLeftRadius: 12, borderTopRightRadius: 12, height: 160}}
-            contentFit='cover'
-          />
-          <View style={{ flexDirection: 'row', gap: 3, alignItems: 'center', }}>
-            <Image
-              source={{uri: 'https://res.cloudinary.com/dajzo2zpq/image/upload/v1752247182/properties/wlf2uijbultztvqptnka.jpg'}}
-              style={{ flex: 1, borderBottomLeftRadius: 12, height: 140}}
-              contentFit='cover'
-            />
-            <Image
-              source={{uri: 'https://res.cloudinary.com/dajzo2zpq/image/upload/v1752247182/properties/wlf2uijbultztvqptnka.jpg'}}
-              style={{flex: 1, borderBottomRightRadius: 12, height: 140}}
-              contentFit='cover'
-            />
-          </View>
-          {/* <MaterialCommunityIcons name='arrow-expand' color={theme.colors.text} size={28} style={[styles.shadow, {position:'absolute', bottom: 10, right: 10, padding: 7, }]} /> */}
-          <MaterialCommunityIcons name='arrow-expand' color={theme.colors.text} size={24} style={[styles.shadow, {position:'absolute', bottom: 20, right: 10, padding: 5, borderRadius: '50%', backgroundColor: theme.colors.background}]} />
-        </View>
-        
-        {/* <View style={{paddingTop: 10, }}> */}
+  // console.log(isFav)
 
-          <View style={[ {padding: 10, borderRadius: 12, gap: 10, backgroundColor: theme.colors.backgroundSec}]}>
-            <View>
-              <ThemedText type='subtitle'> {mockExperience.title} </ThemedText>
-              <ThemedText style={{borderBottomWidth: 1, borderColor: theme.colors.border, paddingBottom: 5}}> {mockExperience.experience_overview} </ThemedText>
-            </View>
 
-            <View style={{flexDirection: 'row', alignItems:'center', gap: 10, borderBottomWidth: 1, borderColor: theme.colors.border, paddingBottom: 5}}>
-              
-              <Image source={require('@/assets/images/host-avatar.jpg')} style={{width: 50, height: 50, borderRadius: '50%'}} />
-              <View style={{justifyContent: 'space-between', flexWrap: 'wrap', flex:1}}>
-                <ThemedText type='defaultSemiBold'>{mockExperience.host.name}. {mockExperience.professional_title} </ThemedText>
-                <ThemedText style={{flexShrink: 1, width: '100%'}}>{mockExperience.host.description} </ThemedText>
-              </View>
-            </View>
 
-            <View style={{flexDirection: 'row', alignItems:'center', gap: 10,}}>
-              <View style={[styles.shadow, {padding: 5, backgroundColor: theme.colors.backgroundSec, borderRadius: 12}]}><MapPin size={40} color={theme.colors.text}/></View>
-              {/* <Image source={require('@/assets/images/map.jpg')} style={[styles.shadow, {width: 50, height: 50, borderRadius: 15,backgroundColor: 'white', shadowColor: '#fff'}]} /> */}
-              <View style={{justifyContent: 'space-between', flexWrap: 'wrap', flex:1}}>
-                <ThemedText type='defaultSemiBold'>{mockExperience.address.city.name}. Delta </ThemedText>
-                <ThemedText>{mockExperience.address.city.country.name} </ThemedText>
-              </View>
-            </View>
-          </View>
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle="light-content" />
+      
+      <ScrollView
+        ref={scrollViewRef}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Image Gallery */}
+        <View style={styles.imageGallery}>
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={(e) => {
+              const index = Math.round(e.nativeEvent.contentOffset.x / width);
+              setCurrentImageIndex(index);
+            }}
+            scrollEventThrottle={16}
+          >
+            {propertyData.images.map((image, index) => (
+              <Image
+                key={index}
+                source={{ uri: image }}
+                style={styles.image}
+                resizeMode="cover"
+              />
+            ))}
+          </ScrollView>
           
-
-          <Line orientation='horizontal' style={{marginVertical: 10}} />
-
-          <View>
-            <ThemedText type='subtitle' style={{paddingBottom: 10}}>What you'll do </ThemedText>
-            {[0,1,2,3].map((item, index) => (
-              <View key={index} style={{flexDirection: 'row', alignItems:'center', gap: 10, marginVertical: 5}} >
-                {/* <View style={[styles.shadow, {padding: 0, backgroundColor: theme.colors.backgroundSec, borderRadius: 12}]}> */}
-                  <Image source={require('@/assets/images/map.jpg')} style={{width: 70, height: 70, borderRadius: 12}} />
-                {/* </View> */}
-                <View style={{justifyContent: 'space-evenly', flexWrap: 'wrap', flex:1, height: 70}}>
-                  <ThemedText type='defaultSemiBold'>{mockExperience?.itineraries[0]?.activity![0].title} </ThemedText>
-                  <ThemedText secondary style={styles.description}>{mockExperience?.itineraries[0]?.activity![0].description} </ThemedText>
-                </View>
-              </View>
+          {/* Image Indicators */}
+          <View style={styles.imageIndicators}>
+            {propertyData.images.map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.indicator,
+                  {
+                    backgroundColor: currentImageIndex === index ? '#FFFFFF' : 'rgba(255,255,255,0.5)',
+                  },
+                ]}
+              />
             ))}
           </View>
 
-          <Line orientation='horizontal' style={{marginVertical: 10,}} />
-
-
-          <View>
-            <ThemedText type='subtitle' style={{paddingBottom: 15}}>Where you'll be</ThemedText>
-            <View>
-              <Image source={require('@/assets/images/map.jpg')} style={{width: '100%', height: 400, borderRadius: 25}} />
-            </View>
-            <ThemedText type='defaultSemiBold' style={{textAlign:'center', paddingVertical: 5}}>{mockExperience.address.city.name} Delta State . {mockExperience.address.city.country.name} </ThemedText>
-
-          </View>
-
-          <Line orientation='horizontal' style={{marginVertical: 10,}} />
-
-          <View>
-            <ThemedText type='subtitle' style={{paddingBottom: 15}}>Reviews & Reviews </ThemedText>
-            <FlatList 
-              data={mockExperience.reviews}
-              renderItem={({item, index}) => (
-                <View style={[ {padding: 15, borderRadius: 12, gap: 7, backgroundColor: theme.colors.background2, width:width*0.869, shadowColor: theme.colors.shadow}]}>
-                  <View style={{flexDirection: 'row', alignItems:'center', gap: 10, }}>
-              
-                    <Image source={require('@/assets/images/host-avatar.jpg')} style={{width: 45, height: 45, borderRadius: '50%'}} />
-                    <View style={{justifyContent: 'space-between', flexWrap: 'wrap', flex:1}}>
-                      <ThemedText type='defaultSemiBold'>{item.user.name} </ThemedText>
-                      <ThemedText secondary>{mockExperience.address.city.country.name} </ThemedText>
-                    </View>
-                  </View>
-                  <View style={{flexDirection:'row', alignItems:'center', gap: 3}}>
-                    <StarRating rating={item.rating}/>
-                    <MaterialCommunityIcons name='circle' color={theme.colors.textSecondary} size={5} />
-                    <ThemedText>{'3 days ago'} </ThemedText>
-                  </View>
-                  <ThemedText style={{color: theme.colors.textSecondary}}>{item.comment} </ThemedText>
-                </View>
-              )}
-              keyExtractor={(index) => index.id.toString()}
-              pagingEnabled
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{gap: 10, }}
-            />
-            <TouchableOpacity style={{padding: 10, backgroundColor: theme.colors.background2, marginVertical: 10, justifyContent:'center', alignItems:'center', borderRadius: 16}}>
-              <ThemedText type='defaultSemiBold'>Show More</ThemedText>
+          {/* Header Buttons */}
+          <View style={styles.headerButtons}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
+              <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
             </TouchableOpacity>
-          </View>
-
-          <Line orientation='horizontal' style={{marginVertical: 10,}} />
-
-          <View >
-            <ThemedText type='subtitle' style={{paddingBottom: 15}}>Availability </ThemedText>
-
-            {/* <View style={{overflow: 'scroll', flexDirection: 'row', alignItems:'center', gap: 10}}>
-              {[0,1,2,3].map((item, index) => (
-                <View key={index} style={{padding: 10, borderRadius: 12, borderWidth: 1, width: 200,  borderColor: theme.colors.border}}>
-
-                </View>
-              ))}
-            </View> */}
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{gap: 10}}
-              snapToInterval={200 + 10} // Item width + gap
-              snapToAlignment="start"
-              decelerationRate="fast"
-            >
-              {[0, 1, 2, 3].map((item, index) => (
-                <View
-                  key={index}
-                  style={[styles.shadow1, { padding: 10, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, width: 200, gap: 10 }]} // Adjusted width for partial visibility
-                >
-                  <View>
-                    <ThemedText type='defaultSemiBold' style={{fontSize: 16}}>Wednesday,</ThemedText>
-                    <ThemedText type='defaultSemiBold' style={{fontSize: 16}}>September 2nd</ThemedText>
-                  </View>
-                  <ThemedText secondary>10AM - 12AM</ThemedText>
-                  <ThemedText secondary type='defaultSemiBold'>7 spots Available</ThemedText>
-                  
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-
-          <Line orientation='horizontal' style={{marginVertical: 10,}} />
-
-          <View>
-            <ThemedText type='subtitle' style={{paddingBottom: 15}}>Requirements </ThemedText>
-
-
-          </View>
-
-          <Line orientation='horizontal' style={{marginVertical: 10,}} />
-
-          <View>
-            <ThemedText type='subtitle' style={{paddingBottom: 15}}>About your host </ThemedText>
-
-            <View style={{flexDirection: 'row', gap: 15, alignItems:'flex-end'}}>
-              <TouchableOpacity style={[styles.shadow1, { marginLeft: 4, width: '43%', height: 160, justifyContent: 'center', alignItems: 'center', borderRadius: 20, backgroundColor: theme.colors.background}]}>
-                <Image source={require('@/assets/images/host-avatar.jpg')} style={{width: 100, height: 100, borderRadius: '50%'}} />
+            <View style={styles.headerRight}>
+              <TouchableOpacity style={styles.headerButton} onPress={handleShare}>
+                <Ionicons name="share-outline" size={22} color="#FFFFFF" />
               </TouchableOpacity>
-              {/* 20 words */}
-              <ThemedText style={{flexShrink:1, fontSize: 17}}><ThemedText type='defaultSemiBold'>Lorem ipsum dolor</ThemedText> sit amet consectetur adipisicing elit. Corrupti pariatur dolore dolorum possimus iste vel 
-                excepturi quas facilis reiciendis recusandae.
-              </ThemedText>
+              <TouchableOpacity style={styles.headerButton} onPress={() => handleToggleFavorite()}>
+                <Ionicons name={isFav() ? "heart": "heart-outline"} size={22} color="#FFFFFF" />
+              </TouchableOpacity>
             </View>
+          </View>
+        </View>
 
-            <ThemedText type='body' style={{paddingTop:10, fontSize: 16}}>
-              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Soluta quod voluptatibus adipisci earum ab porro. Sint assumenda facilis, obcaecati dolorem asperiores
-               corrupti nisi cumque eveniet in, omnis dolorum suscipit rem maxime itaque illo velit necessitatibus veritatis, quam iusto delectus sequi nemo distinctio. Iste
-                officiis minus molestias iusto laudantium vel libero!
-            </ThemedText>
-
-            <TouchableOpacity style={{padding: 10, backgroundColor: theme.colors.background2, marginVertical: 10, justifyContent:'center', alignItems:'center', borderRadius: 12}}>
-              <ThemedText type='defaultSemiBold'>Message {mockExperience.host.name}</ThemedText>
-            </TouchableOpacity>
-
+        {/* Property Overview */}
+        <View style={[styles.section, { backgroundColor: colors.background }]}>
+          <Text style={[styles.title, { color: colors.text }]}>
+            {data.name}
+          </Text>
+          
+          <View style={styles.overviewRow}>
+            <View style={styles.ratingContainer}>
+              <Ionicons name="star" size={16} color={colors.warning || '#F59E0B'} />
+              <Text style={[styles.rating, { color: colors.text }]}>
+                {propertyData.rating}
+              </Text>
+              <Text style={[styles.reviewCount, { color: colors.textSecondary }]}>
+                ({propertyData.reviewCount} reviews)
+              </Text>
+            </View>
+            <Text style={[styles.location, { color: colors.textSecondary }]}>
+              {data.property.address?.city}, {data.property.address?.country}
+            </Text>
           </View>
 
-          <Line orientation='horizontal' style={{marginVertical: 10,}} />
+          <View style={[styles.detailsRow, { borderTopColor: colors.border }]}>
+            <View style={styles.detailItem}>
+              <Ionicons name="people-outline" size={20} color={colors.icon} />
+              <Text style={[styles.detailText, { color: colors.text }]}>
+                {data.capacity} guests
+              </Text>
+            </View>
+            <View style={styles.detailItem}>
+              <Ionicons name="bed-outline" size={20} color={colors.icon} />
+              <Text style={[styles.detailText, { color: colors.text }]}>
+                {data.bedCount} beds
+              </Text>
+            </View>
+            <View style={styles.detailItem}>
+              <MaterialIcons name="bathtub" size={20} color={colors.icon} />
+              <Text style={[styles.detailText, { color: colors.text }]}>
+                {data.bathroomCount} baths
+              </Text>
+            </View>
+          </View>
+        </View>
 
-        {/* </View> */}
+        {/* Divider */}
+        <View style={[styles.divider, { borderBottomColor: colors.border }]} />
+
+        {/* Host Information */}
+        <View style={[styles.section, { backgroundColor: colors.background }]}>
+          <View style={styles.hostHeader}>
+            <View style={styles.hostInfo}>
+              <Image
+                source={{ uri: propertyData.host.image }}
+                style={styles.hostImage}
+              />
+              <View>
+                <View style={styles.hostNameRow}>
+                  <Text style={[styles.hostName, { color: colors.text }]}>
+                    Hosted by {data.property.realtor.name}
+                  </Text>
+                  {propertyData.host.verified && (
+                    <MaterialIcons name="verified" size={16} color={colors.accent} />
+                  )}
+                </View>
+                <Text style={[styles.hostJoined, { color: colors.textSecondary }]}>
+                  {/* {propertyData.host.joined} */} Joined in {formatDate({timeStamp: data?.property?.realtor.created_at, extract: {year: true}})}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[styles.contactButton, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.contactButtonText, { color: colors.text }]}>
+                Contact
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={[styles.divider, { borderBottomColor: colors.border }]} />
+
+        <View style={[styles.section, { gap: 15,}]}>
+          <View style={{flexDirection: 'row', alignItems:'center', gap: 10,}}>                          
+            <Image source={require('@/assets/images/host-avatar.jpg')} style={{width: 50, height: 50, borderRadius: '50%'}} />
+            <View style={{justifyContent: 'space-between', flexWrap: 'wrap', flex:1}}>
+              <ThemedText type='defaultSemiBold'>Hosted by {data.property.realtor.name}</ThemedText>
+              <ThemedText secondary style={{flexShrink: 1, width: '100%'}}>Superhost • {timeDifference(data?.property?.realtor.created_at)} hosting </ThemedText>
+            </View>
+          </View>
+          <View style={{flexDirection: 'row', alignItems:'center', gap: 10,}}>                          
+            <Ionicons name='home-outline' size={40} color={theme.colors.text} />
+            <View style={{justifyContent: 'space-between', flexWrap: 'wrap', flex:1}}>
+              <ThemedText style={{textTransform: 'capitalize'}} type='defaultSemiBold'>{data.property.property_type} </ThemedText>
+              <ThemedText secondary style={{flexShrink: 1, width: '100%'}}>You'll own the entire house </ThemedText>
+            </View>
+          </View>
+          <View style={{flexDirection: 'row', alignItems:'center', gap: 10, borderBottomWidth: 0, borderColor: theme.colors.border, paddingBottom: 5}}>                          
+            <Ionicons name='location-outline' size={40} color={theme.colors.text} />
+            <View style={{justifyContent: 'space-between', flexWrap: 'wrap', flex:1}}>
+              <ThemedText type='defaultSemiBold'>Great check-in experience</ThemedText>
+              <ThemedText secondary style={{flexShrink: 1, width: '100%'}}>Recent guests loved the smooth start to this stay. </ThemedText>
+            </View>
+          </View>
+        </View>
+        
+        <View style={[styles.divider, { borderBottomColor: colors.border }]} />
+
+        {/* Description */}
+        <View style={[styles.section, { backgroundColor: colors.background }]}>
+          {/* <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            About this place
+          </Text> */}
+          <Text style={[styles.description, { color: colors.text }]}>
+            {data.description?.length! < 20? data.description : propertyData.description}
+          </Text>
+
+          {true && <TouchableOpacity
+            style={[styles.showMoreButton, { backgroundColor: colors.border, borderWidth: 0 }]}
+            onPress={() => setShowAllAmenities(!showAllAmenities)}
+          >
+            <Text style={[styles.showMoreText, { color: colors.text }]}>
+              Show more
+            </Text>
+          </TouchableOpacity>}
+        </View>
+
+        <View style={[styles.divider, { borderBottomColor: colors.border }]} />
+
+        {/* Amenities */}
+        <View style={[styles.section, { backgroundColor: colors.background }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            What this place offers
+          </Text>
+          <View style={styles.amenitiesGrid}>
+            {/* {(showAllAmenities ? propertyData.amenities : propertyData.amenities.slice(0, 6)).map((amenity, index) => (
+              <View key={index} style={styles.amenityItem}>
+                <Text style={[styles.amenityText, { color: colors.text }]}>
+                  {amenity.name}
+                </Text>
+              </View>
+            ))} */}
+            {(data?.amenities)?.map((amenity:string, index: number) => (
+              <View key={index} style={styles.amenityItem}>
+                {/* <MaterialIcons name={amenity.icon} size={24} color={colors.icon} /> */}
+                <Text style={[styles.amenityText, { color: colors.text }]}>
+                  {amenity}
+                </Text>
+              </View>
+            ))}
+          </View>
+          {propertyData.amenities.length > 6 && (
+            <TouchableOpacity
+              style={[styles.showMoreButton, { borderColor: colors.border }]}
+              onPress={() => setShowAllAmenities(!showAllAmenities)}
+            >
+              <Text style={[styles.showMoreText, { color: colors.text }]}>
+                {showAllAmenities ? 'Show less' : `Show all ${propertyData.amenities.length} amenities`}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          <AmenitiesModal isVisible={showAllAmenities} onClose={() => setShowAllAmenities(false)} />
+        </View>
+
+        <View style={[styles.divider, { borderBottomColor: colors.border }]} />
+
+        {/* Reviews */}
+        <View style={[styles.section, { backgroundColor: colors.background }]}>
+          <View style={styles.reviewsHeader}>
+            <View style={styles.ratingLarge}>
+              <Ionicons name="star" size={20} color={colors.warning || '#F59E0B'} />
+              <Text style={[styles.ratingLargeText, { color: colors.text }]}>
+                {propertyData.rating}
+              </Text>
+              <Text style={[styles.reviewCountLarge, { color: colors.textSecondary }]}>
+                · {propertyData.reviewCount} reviews
+              </Text>
+            </View>
+          </View>
+
+          {propertyData.reviews.map((review, index) => (
+            <View key={index} style={styles.reviewItem}>
+              <View style={styles.reviewHeader}>
+                <Image source={{ uri: review.avatar }} style={styles.reviewAvatar} />
+                <View style={styles.reviewHeaderText}>
+                  <Text style={[styles.reviewUser, { color: colors.text }]}>
+                    {review.user}
+                  </Text>
+                  <Text style={[styles.reviewDate, { color: colors.textSecondary }]}>
+                    {review.date}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.reviewStars}>
+                {renderStars(review.rating)}
+              </View>
+              <Text style={[styles.reviewComment, { color: colors.textSecondary }]}>
+                {review.comment}
+              </Text>
+            </View>
+          ))}
+
+          <TouchableOpacity style={[styles.showMoreButton, { borderColor: colors.border }]}>
+            <Text style={[styles.showMoreText, { color: colors.text }]}>
+              Show all {propertyData.reviewCount} reviews
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={[styles.divider, { borderBottomColor: colors.border }]} />
+
+        {/* Location */}
+        <View style={[styles.section, { backgroundColor: colors.background }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>
+            Where you'll be
+          </Text>
+          <ThemedText style={{paddingTop: 10, paddingBottom: 15}}>{data.property.address?.city + ", " + data.property.address?.country} </ThemedText>
+          <View style={[styles.mapPlaceholder, { backgroundColor: colors.backgroundSec }]}>
+            <MaterialIcons name="location-on" size={40} color={colors.primary} />
+            <Text style={[styles.mapText, { color: colors.textSecondary }]}>
+              {data.property.address?.city + ", " + data.property.address?.country}
+            </Text>
+          </View>
+        </View>
+
+        <View style={[styles.divider, { borderBottomColor: colors.border }]} />
+
+        {/* host Information */}
+        <View style={[styles.section, { backgroundColor: colors.background }]}>
+          <ThemedText style={[styles.sectionTitle]}>Hosted by {data.property.realtor.name}</ThemedText>
+
+          <TouchableOpacity onPress={() => router.push('/host_profile/[]')} style={[styles.shadow, {width: '98%', height: 230, borderRadius: 20, borderWidth: 0, padding: 20, paddingHorizontal: 30, flexDirection: 'row', 
+            backgroundColor: theme.mode == 'dark'? theme.colors.backgroundSec: theme.colors.background,
+          }]}>
+            <View style={{height: '100%', width: '40%', justifyContent: 'center', alignItems:'center', }}>
+              <Image
+                source={require('@/assets/images/host-avatar.jpg')} // Replace with actual host image
+                style={styles.hostAvatar}
+              />
+              <ThemedText type='title'>{data.property.realtor.name}</ThemedText>
+              <ThemedText type='defaultSemiBold'>SuperHost</ThemedText>
+            </View>
+            <Line orientation='vertical' style={{marginHorizontal: 40}} />
+            <View style={{ justifyContent: 'space-evenly'}}>
+              <View>
+                <ThemedText type='subtitle'>3.5</ThemedText>
+                <StarRating rating={3.5} />
+              </View>
+              <View>
+                {timeDifference(data?.property?.realtor.created_at).split(' ').map((f, index) => (<React.Fragment key={index}>
+                  {
+                    f.length <= 2 
+                      ? <ThemedText type='subtitle'>{f}</ThemedText>
+                      : <ThemedText type='defaultSemiBold' style={{color: theme.colors.textSecondary, textTransform: 'capitalize'}}>{f}</ThemedText>
+                  }
+                </React.Fragment>
+                ))}
+              </View>
+              <View>
+                <ThemedText type='subtitle'>321</ThemedText>
+                <ThemedText type='defaultSemiBold' style={{color: theme.colors.textSecondary}}>Reviews</ThemedText>
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          <ThemedText type='body' style={{paddingTop: 20, paddingBottom: 10}}>
+            Hi, I'm Andrea, a citizen of the world, I love to travel, meeting people and different cultures. Since 2015 I joined Airbnb and I appreciate its philosophy, I had a great time, I have memories of friends in the countries where I used it. When my parents passed away, I found myself the owner of two houses and I am offering my available accommodation in what used to be my grandparents’ house. 
+          </ThemedText>
+
+          <View style={{gap: 5}}>
+            <ThemedText type='defaultSemiBold' >Andrea is a Superhost</ThemedText>
+            <ThemedText secondary >
+              Superhosts are experienced, highly rated hosts who are committed to providing great stays for guests.
+            </ThemedText>
+            <ThemedText secondary>Response rate: 100%</ThemedText>
+            <ThemedText secondary>Responds within an hour</ThemedText>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.showMoreButton, { backgroundColor: colors.border, borderWidth: 0 }]}
+            onPress={() => setShowAllAmenities(!showAllAmenities)}
+          >
+            <Text style={[styles.showMoreText, { color: colors.text }]}>
+              Message {propertyData.host.name.split(' ')[0]}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* House Rules */}
+        {/* <View style={[styles.section, { backgroundColor: colors.background }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Things to know
+          </Text>
+          {propertyData.rules.map((rule, index) => (
+            <View key={index} style={styles.ruleItem}>
+              <Ionicons
+                name="checkmark-circle"
+                size={20}
+                color={colors.success}
+              />
+              <Text style={[styles.ruleText, { color: colors.textSecondary }]}>
+                {rule}
+              </Text>
+            </View>
+          ))}
+        </View> */}
+
+        {/* Bottom Spacing */}
+        <View style={{ height: 100 }} />
       </ScrollView>
-    </ThemedView>
-  );
 
+      {/* Sticky Booking Bar */}
+      <View style={[styles.bookingBar, { 
+        backgroundColor: colors.card,
+        borderTopColor: colors.border,
+        shadowColor: colors.shadow,
+      }]}>
+        <View style={styles.priceContainer}>
+          <Text style={[styles.price, { color: colors.text }]}>
+            ${data.derivedPrice || data.basePrice}
+            <Text style={[styles.priceLabel, { color: colors.textSecondary, textTransform: 'capitalize' }]}>
+              {' '}/ {data?.duration}
+            </Text>
+          </Text>
+          <View style={styles.priceRating}>
+            <Ionicons name="checkbox-sharp" size={14} color={colors.accent} />
+            <Text style={[styles.priceRatingText, { color: colors.text }]}>
+              Free cancellation
+            </Text>
+          </View>
+        </View>
+        {/* <TouchableOpacity onPress={() => console.log('sisoi')} */}
+        <TouchableOpacity 
+          onPress={() => router.push({
+            pathname: '/(guest)/(modals)/reserve/[query]',
+            params: {query: data.id}
+          })}
+          // onPress={() => router.push('/ge')}
+          style={[styles.reserveButton, { backgroundColor: colors.primary }]}
+        >
+          <Text style={styles.reserveButtonText}>Check availability</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
-  title: {
-    flexShrink: 1,
-    width: '100%',
-    textAlign: 'left',
-    margin: 0,
-    padding: 0,
-  },
-  description: {
-    flexShrink: 1,
-    width: '100%',
-    textAlign: 'left',
-  },
   container: {
     flex: 1,
   },
-  scrollView: {
-    flex: 1,
+  scrollContent: {
+    paddingBottom: 20,
   },
-  header: {
+  imageGallery: {
+    height: height * 0.4,
+    position: 'relative',
+  },
+  image: {
+    width: width,
+    height: height * 0.4,
+  },
+  imageIndicators: {
+    position: 'absolute',
+    bottom: 16,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  indicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  headerButtons: {
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
   },
   headerButton: {
-    padding: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  section: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  overviewRow: {
+    marginBottom: 16,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 4,
+  },
+  rating: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  reviewCount: {
+    fontSize: 14,
+  },
+  location: {
+    fontSize: 14,
+  },
+  detailsRow: {
+    flexDirection: 'row',
+    gap: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  detailText: {
+    fontSize: 15,
+  },
+  divider: {
+    borderBottomWidth: 1,
+    marginHorizontal: 20
+  },
+  hostHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  hostInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  hostImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  hostNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  hostName: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  hostJoined: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  contactButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  contactButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  description: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  amenitiesGrid: {
+    gap: 16,
+  },
+  amenityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  amenityText: {
+    fontSize: 15,
+  },
+  showMoreButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  showMoreText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  reviewsHeader: {
+    marginBottom: 20,
+  },
+  ratingLarge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  ratingLargeText: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  reviewCountLarge: {
+    fontSize: 16,
+  },
+  reviewItem: {
+    marginBottom: 24,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 8,
+  },
+  reviewAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  reviewHeaderText: {
+    flex: 1,
+  },
+  reviewUser: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  reviewDate: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  reviewStars: {
+    flexDirection: 'row',
+    gap: 2,
+    marginBottom: 8,
+  },
+  reviewComment: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  mapPlaceholder: {
+    height: 200,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  mapText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  ruleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  ruleText: {
+    fontSize: 15,
+    flex: 1,
+  },
+  bookingBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingBottom: 40,
+    // borderTopWidth: 1,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  priceContainer: {
+    flex: 1,
+  },
+  price: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  priceLabel: {
+    fontSize: 14,
+    fontWeight: '400',
+  },
+  priceRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  priceRatingText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  reserveButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 15,
+    marginLeft: 12,
+  },
+  reserveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  hostAvatar: {
+    width: 110,
+    height: 110,
+    borderRadius: '50%',
   },
   shadow: {
-    shadowOffset: { width: 0, height: 1},
+    shadowOffset: { width: 0, height: 0},
     shadowOpacity: 0.3,
-    shadowRadius: 3,
+    shadowRadius: 6,
+    shadowColor: '#000',
     elevation: 6,
-  },
-  shadow1: {
-    shadowOffset: { width: 0, height: 1},
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 6,
-    
   },
 });
 
-export default ExperienceDetailScreen;
+export default PropertyDetailsScreen;
+

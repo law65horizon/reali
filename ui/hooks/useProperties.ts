@@ -1,151 +1,186 @@
+// hooks/useProperties.ts
+import { GET_PROPERTIES } from '@/graphql/queries';
+import { useSearchStore } from '@/stores';
 import { useQuery } from '@apollo/client';
-import gql from 'graphql-tag';
-import { useEffect } from 'react';
+import { useMemo } from 'react';
 
-export const GET_PROPERTIES = gql`
-  query GetProperties($first: Int!, $after: String) {
-    getProperties(first: $first, after: $after) {
-      totalCount
-      edges {
-        cursor
-        node {
-          id
-          realtor_id
-          address_id
-          title
-          speciality
-          amenities
-          price
-          description
-          status
-          created_at
-          updated_at
-          images {
-            id
-            url
-          }
-          address {
-            id
-            street
-            city
-            country
-          }
-        }
-      }
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-    }
-  }
-`;
-
-
-export const useProperties = (query?: any) => {
-  const { data, loading, error, fetchMore, networkStatus } = useQuery(GET_PROPERTIES, {
-    variables: { first: 5 },
-    notifyOnNetworkStatusChange: true,
-  });
-
-  const loadMore = () => {
-    if (!data?.getProperties.pageInfo.hasNextPage || networkStatus === 3) return;
-
-    fetchMore({
-      variables: {
-        first: 10,
-        after: data.getProperties.pageInfo.endCursor,
-      },
-    });
+export interface Property {
+  id: string;
+  realtor_id: string;
+  address_id: string;
+  title: string;
+  speciality?: string;
+  amenities?: string[];
+  price: number;
+  description?: string;
+  status: 'ACTIVE' | 'PENDING' | 'SOLD';
+  created_at: string;
+  baths: any,
+  bedrooms: any, 
+  beds: any,
+  type: any,
+  category: any
+  updated_at: string;
+  images: Array<{
+    id: string;
+    url: string;
+  }>;
+  address: {
+    id: string;
+    street: string;
+    city: string;
+    country: string;
   };
+}
 
-  // Debug: Log IDs to check for duplicates/missing
-  useEffect(() => {
-    if (data) {
-      const ids = data.getProperties.edges.map((edge: any) => edge.node.id);
-      const uniqueIds = new Set(ids);
-      if (uniqueIds.size !== ids.length) {
-        console.warn('Duplicate IDs detected:', ids.filter((id: any, index: number) => ids.indexOf(id) !== index));
-      } else if (ids.some((id:any) => id == null)) {
-        console.warn('Missing IDs detected in some items');
-      }
-      console.log('Property IDs:', ids);
+interface PropertiesResponse {
+  searchProperties: {
+    totalCount: number;
+    edges: Array<{
+      cursor: string;
+      node: Property;
+    }>;
+    pageInfo: {
+      hasNextPage: boolean;
+      endCursor: string;
+    };
+  };
+}
+
+const ITEMS_PER_PAGE = 5;
+
+export function useProperties() {
+  const { query, filters } = useSearchStore();
+
+  const { data, loading, error, fetchMore, refetch, networkStatus } = useQuery<PropertiesResponse>(
+    GET_PROPERTIES,
+    {
+      variables: {
+        input: {query: null},
+        first: ITEMS_PER_PAGE,
+        after: null,
+      },
+      notifyOnNetworkStatusChange: true,
     }
+  );
+
+  // Extract properties from edges
+  const properties = useMemo(() => {
+    return data?.searchProperties?.edges?.map((edge) => edge.node) || [];
   }, [data]);
 
+  // Filter properties based on search query and filters
+  const filteredProperties = useMemo(() => {
+    let result = properties;
+
+    // Text search filter
+    if (query?.trim()) {
+      const normalized = query.toLowerCase().trim();
+      result = result.filter((p) => {
+        const matchesTitle = p.title?.toLowerCase().includes(normalized);
+        const matchesCity = p.address?.city?.toLowerCase().includes(normalized);
+        const matchesCountry = p.address?.country?.toLowerCase().includes(normalized);
+        const matchesStreet = p.address?.street?.toLowerCase().includes(normalized);
+        return matchesTitle || matchesCity || matchesCountry || matchesStreet;
+      });
+    }
+
+    // Segment filter (for-sale, for-rent, sold)
+    if (filters.segment) {
+      result = result.filter((p) => {
+        const status = p.status?.toLowerCase();
+        if (filters.segment === 'sold') return status === 'sold';
+        if (filters.segment === 'for-sale') return status !== 'sold';
+        if (filters.segment === 'for-rent') return status === 'active' || status === 'pending';
+        return true;
+      });
+    }
+
+    // Price range filter
+    if (filters.priceRange) {
+      result = result.filter(
+        (p) => p.price >= filters.priceRange.min && p.price <= filters.priceRange.max
+      );
+    }
+
+    // Bedrooms filter
+    if (filters.bedrooms !== 'any') {
+      result = result.filter((p) => {
+        const beds = p.beds || ((p.price % 3) + 2); // fallback logic from your code
+        return beds >= filters.bedrooms;
+      });
+    }
+
+    // Bathrooms filter
+    if (filters.bathrooms !== 'any') {
+      result = result.filter((p) => {
+        const baths = p.baths || ((p.price % 2) + 1);
+        return baths >= filters.bathrooms;
+      });
+    }
+
+    // Property type filter
+    if (filters.propertyTypes.length > 0) {
+      result = result.filter((p) => {
+        const type = (p.category || p.type || 'home').toLowerCase();
+        return filters.propertyTypes.some((t) => t.toLowerCase() === type);
+      });
+    }
+
+    // Amenities filter
+    if (filters.amenities.length > 0) {
+      result = result.filter((p) => {
+        const propertyAmenities = (p.amenities || []).map((a) => a.toLowerCase());
+        return filters.amenities.every((amenity) =>
+          propertyAmenities.includes(amenity.toLowerCase())
+        );
+      });
+    }
+
+    return result;
+  }, [properties, query, filters]);
+
+  // Load more function for infinite scroll
+  const loadMore = async () => {
+    if (!data?.searchProperties?.pageInfo?.hasNextPage || loading) return;
+
+    try {
+      await fetchMore({
+        variables: {
+          first: 5,
+          after: data.searchProperties.pageInfo.endCursor,
+        },
+        // updateQuery: (prev, { fetchMoreResult }) => {
+        //   if (!fetchMoreResult) return prev;
+
+        //   return {
+        //     searchProperties: {
+        //       ...fetchMoreResult.searchProperties,
+        //       edges: [
+        //         ...prev.searchProperties.edges,
+        //         ...fetchMoreResult.searchProperties.edges,
+        //       ],
+        //     },
+        //   };
+        // },
+      });
+    } catch (err) {
+      console.error('Error loading more properties:', err);
+    }
+  };
+
+  const hasNextPage = data?.searchProperties?.pageInfo?.hasNextPage || false;
+  const totalCount = data?.searchProperties?.totalCount || 0;
+
   return {
-    data: data?.getProperties.edges.map((edge: any) => edge.node) || [],
+    data: data?.searchProperties?.edges?.map((edge) => edge.node) || [],
+    // data: data?.searchProperties?.edges?.map((edge) => edge.node) || [],
     loading,
     error,
     loadMore,
-    hasNextPage: data?.getProperties.pageInfo.hasNextPage || false,
-    networkStatus,
+    hasNextPage,
+    refetch,
+    totalCount,
+    isRefetching: networkStatus === 4,
   };
-};
-
-export const useSectionedProperties = (query?: any) => {
-  const { data, loading, error, fetchMore, networkStatus } = useQuery(GET_PROPERTIES, {
-    variables: { first: 10, input: {query} },
-    // variables: { first: 10, input: {maxPrice: query?.maxPrice, minPrice: query?.minPrice} },
-    notifyOnNetworkStatusChange: true,
-    fetchPolicy: 'cache-and-network',
-  });
-
-  console.log(loading, error, data)
-  // Group experiences by city
-  const groupByCity = (edges: any[]) => {
-    const grouped = edges.reduce((acc, { node }) => {
-      const city = node.address?.city || 'Unknown';
-      if (!acc[city]) {
-        acc[city] = { title: city, data: [] };
-      }
-      acc[city].data.push({
-        id: node.id,
-        name: node.title,
-        price: node.price,
-        location: node.address?.city,
-        tag: node.category,
-        image: node.images?.[0]?.url || 'https://via.placeholder.com/170x140.png?text=Experience',
-        rating: node.reviews?.length ? (node.reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / node.reviews.length).toFixed(2) : '0.00'
-      });
-      return acc;
-    }, {} as { [key: string]: { title: string; data: any[] } });
-
-    return Object.values(grouped).sort((a:any, b:any) => a.title.localeCompare(b.title));
-  };
-
-  const loadMore = () => {
-    if (!data?.getProperties?.pageInfo?.hasNextPage || networkStatus === 3) return;
-
-    fetchMore({
-      variables: {
-        first: 10,
-        after: data.getProperties.pageInfo.endCursor,
-      },
-    });
-  };
-
-  // Debug: Log IDs to check for duplicates
-  useEffect(() => {
-    if (data) {
-      console.log('Data in useExperiences hook:', data?.getProperties);
-      const ids = data.getProperties?.edges?.map((edge: any) => edge.node.id) || [];
-      const uniqueIds = new Set(ids);
-      if (uniqueIds.size !== ids.length) {
-        console.warn('Duplicate IDs detected:', ids.filter((id: any, index: number) => ids.indexOf(id) !== index));
-      } else if (ids.some((id: any) => id == null)) {
-        console.warn('Missing IDs detected in some items');
-      }
-      console.log('Experience IDs:', ids);
-    }
-  }, [data]);
-
-  return {
-    // sections: data?.getProperties?.edges ? data.getProperties.edges.map((edge: any) => edge.node) : [],
-    sections: data?.getProperties?.edges ? groupByCity(data.getProperties.edges) : [],
-    loading,
-    error: error ? error.message : null,
-    loadMore,
-    hasNextPage: data?.searchExperiences?.pageInfo?.hasNextPage || false,
-    networkStatus,
-  };
-};
+}

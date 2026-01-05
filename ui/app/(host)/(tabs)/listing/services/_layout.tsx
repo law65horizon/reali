@@ -3,7 +3,7 @@
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { useFormStore } from '@/store/homeStore';
+import { useFormStore } from '@/stores/homeStore';
 import { useTheme } from '@/theme/theme';
 import { gql, useMutation } from '@apollo/client';
 import { Stack, useNavigation, useSegments } from 'expo-router';

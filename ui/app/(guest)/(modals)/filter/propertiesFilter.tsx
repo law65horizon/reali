@@ -1,13 +1,14 @@
 import { ThemedText } from '@/components/ThemedText';
 import { Line } from '@/components/ui/Line';
 import CustomPriceRange from '@/components/ui/PriceRange';
-import { useFilterStore } from '@/store/filterStore';
+import { useFilterStore } from '@/stores/filterStore';
 import { useTheme } from '@/theme/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import React, { useState } from 'react';
-import { Dimensions, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Button } from 'react-native-elements';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const Amenities = [
     {
@@ -387,7 +388,6 @@ const styles = StyleSheet.create({
 
 export default FiltersScreen;
 
-// import { useNavigation } from '@react-navigation/native';
 // import React from 'react';
 // import { Dimensions, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 // import { Button } from 'react-native-elements';

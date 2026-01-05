@@ -1,7 +1,7 @@
 import { ThemedText } from '@/components/ThemedText'
 import { ThemedView } from '@/components/ThemedView'
 import Card from '@/components/ui/Card'
-import { useExperienceStore } from '@/store/experienceStore'
+import { useExperienceStore } from '@/stores/experienceStore'
 import { useTheme } from '@/theme/theme'
 import { Image } from 'expo-image'
 import { router } from 'expo-router'

@@ -1,4 +1,4 @@
-import { useExperienceStore } from '@/store/experienceStore';
+import { useExperienceStore } from '@/stores/experienceStore';
 import { ImageProps } from '@/types/type';
 import { gql, useMutation } from '@apollo/client';
 import { useNavigation } from '@react-navigation/native';

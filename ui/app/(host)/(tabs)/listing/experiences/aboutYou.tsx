@@ -3,13 +3,14 @@ import { ThemedView } from '@/components/ThemedView';
 import Card from '@/components/ui/Card';
 import InputField from '@/components/ui/InputField';
 import PreviousNextUI from '@/components/ui/PreviousNextUI';
-import { useExperienceStore } from '@/store/experienceStore';
+import { useExperienceStore } from '@/stores/experienceStore';
 import { useTheme } from '@/theme/theme';
 import { Entypo, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Dimensions, Modal, Pressable, SafeAreaView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Modal, Pressable, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { EventRegister } from 'react-native-event-listeners';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('screen');
 

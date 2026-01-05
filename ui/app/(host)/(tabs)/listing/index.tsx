@@ -4,7 +4,6 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import Dropdown from '@/components/ui/DropDownMenu';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { useSession } from '@/context/ctx';
 import { useTheme } from '@/theme/theme';
 import { Entypo, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -73,7 +72,6 @@ const data = [
 
 export default function Listings() {
   const {theme} = useTheme()
-  const {signOut: removeSesssion} = useSession()
   const perform = async() => {
     // try {
     //   signOut()

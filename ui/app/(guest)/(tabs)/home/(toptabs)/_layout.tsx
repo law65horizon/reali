@@ -36,8 +36,9 @@ export default function TopTabLayout() {
               router.push({pathname: '/(guest)/(modals)/base_search/[query]', params: {query: JSON.stringify({type: currentSegment.toLowerCase()})}})
             } else {
               router.push({pathname: '/(guest)/(modals)/base_search/[query]', params: {query: JSON.stringify({type: 'homes'})}})
+              // router.push({pathname: '/(guest)/(modals)/base_search/[query]', params: {query: JSON.stringify({type: 'homes'})}})
             }
-            // router.push({pathname: '/(guest)/(modals)/base_search/[query]', params: {query: JSON.stringify({type: currentSegment.toLowerCase()})}})
+            // router.push('/(guest)/(modals)/base_search/[query]')
           }}
           style={[
             { paddingHorizontal: 12, flex: 1},
@@ -53,7 +54,12 @@ export default function TopTabLayout() {
   
         </Pressable>
         <View style={{ flexDirection: 'row', alignItems: "center", justifyContent: 'space-between', paddingHorizontal: 10, width: 50,}} >
-          <Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Notifications"
+            onPress={() => console.log('Notifications tapped')}
+            onLongPress={() => console.log('Notifications long-pressed')}
+          >
             <MaterialCommunityIcons name="bell-badge" size={24} color={theme.colors.text} />
           </Pressable>
         </View>

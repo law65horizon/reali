@@ -2,7 +2,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import InputField from '@/components/ui/InputField';
 import PreviousNextUI from '@/components/ui/PreviousNextUI';
-import { useExperienceStore } from '@/store/experienceStore';
+import { useExperienceStore } from '@/stores/experienceStore';
 import { useTheme } from '@/theme/theme';
 import { ImageProps, ItineraryProps } from '@/types/type';
 import { Entypo, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -11,16 +11,16 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Dimensions,
-  FlatList,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Dimensions,
+    FlatList,
+    Modal,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';

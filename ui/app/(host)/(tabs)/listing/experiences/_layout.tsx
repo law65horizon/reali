@@ -1,6 +1,6 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { useExperienceStore } from '@/store/experienceStore';
+import { useExperienceStore } from '@/stores/experienceStore';
 import { useTheme } from '@/theme/theme';
 import { ImageProps } from '@/types/type';
 import { gql, useMutation } from '@apollo/client';

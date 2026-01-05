@@ -1,9 +1,7 @@
 // app/(guest)/_layout.tsx
-import { useSession } from '@/context/ctx';
 import { Stack } from 'expo-router';
 
 export default function GuestLayout() {
-  const { session } = useSession();
 
 //   if (userRole !== 'guest') return null; // Ensure only guests see this layout
 
@@ -29,7 +27,7 @@ export default function GuestLayout() {
         />
         <Stack.Screen name='(modals)/base_search/[query]' 
           options={{ 
-            presentation: 'containedTransparentModal',
+            presentation: 'containedModal',
             animation: 'fade',
             headerShown: false,
           }}
@@ -51,6 +49,15 @@ export default function GuestLayout() {
           }}
         />
         <Stack.Screen
+          name="(modals)/reserve/[query]"
+          options={{
+            presentation: 'fullScreenModal',
+            animation: 'fade',
+            headerShown: false,
+            
+          }}
+        />
+        <Stack.Screen
           name="(modals)/experienceDetail/[query]"
           options={{
             presentation: 'fullScreenModal',
@@ -60,6 +67,14 @@ export default function GuestLayout() {
         />
         <Stack.Screen
           name="(modals)/filter/propertiesFilter"
+          options={{
+            presentation: 'fullScreenModal',
+            animation: "ios_from_left",
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="(modals)/filter/FilterScreen"
           options={{
             presentation: 'fullScreenModal',
             animation: "ios_from_left",

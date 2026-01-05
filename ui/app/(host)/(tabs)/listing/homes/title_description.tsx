@@ -1,18 +1,18 @@
 import { ThemedText } from '@/components/ThemedText'
 import { ThemedView } from '@/components/ThemedView'
 import PreviousNextUI from '@/components/ui/PreviousNextUI'
-import { useHomeStore } from '@/store/homeStore'
+import { useHomeStore } from '@/stores/homeStore'
 import { useTheme } from '@/theme/theme'
 import { router } from 'expo-router'
 import React, { useState } from 'react'
 import {
-  Dimensions,
-  Keyboard,
-  KeyboardEvent,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Dimensions,
+    Keyboard,
+    KeyboardEvent,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native'
 
 const { width, height } = Dimensions.get('screen')

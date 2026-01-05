@@ -1,9 +1,7 @@
 // app/(guest)/_layout.tsx
-import { useSession } from '@/context/ctx';
 import { Stack } from 'expo-router';
 
 export default function GuestLayout() {
-  const { session } = useSession();
 
 //   if (userRole !== 'guest') return null; // Ensure only guests see this layout
 

@@ -22,7 +22,7 @@ const ExperienceItem = memo(({ item, index, section, theme }: any) => (
   //   asChild
   // >
     <View style={{ marginLeft: index === 0 ? 16 : 0 }}>
-      <Card style={styles.propertyCard} elevated onPress={() => router.push(`/listing/${item.id}`)}>
+      <Card style={styles.propertyCard} elevated onPress={() => router.push({ pathname: '/(guest)/(modals)/listing/[listing]', params: { listing: String(item.id) } })}>
         <View style={styles.imageContainer}>
           <Image
             source={{ uri: 'https://res.cloudinary.com/dajzo2zpq/image/upload/w_300,h_200/v1752247182/properties/wlf2uijbultztvqptnka.jpg' }}
@@ -69,7 +69,8 @@ function ExperiencesTab() {
 
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      setHideIcons(e.nativeEvent.contentOffset.y > 0);
+      const y = e.nativeEvent.contentOffset.y;
+      setHideIcons(y > 80);
     },
     [setHideIcons]
   );
@@ -135,8 +136,11 @@ function ExperiencesTab() {
     return (
       <ThemedView style={styles.container}>
         <ThemedText type="defaultSemiBold" style={{ color: 'red', textAlign: 'center', marginTop: 20 }}>
-          Error: {error}
+          Something went wrong
         </ThemedText>
+        <Pressable onPress={() => loadMore()} style={{ alignSelf: 'center', marginTop: 10 }}>
+          <ThemedText type="link">Retry</ThemedText>
+        </Pressable>
       </ThemedView>
     );
   }
@@ -157,7 +161,17 @@ function ExperiencesTab() {
         contentContainerStyle={[styles.flatListContent, { paddingBottom: insets.bottom + 100 }]}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={() => (
-          <ActivityIndicator style={{ flex: 1, marginTop: 50 }} size="large" color={theme.colors.text} animating={true} />
+          <View style={{ alignItems: 'center', marginTop: 50 }}>
+            <ActivityIndicator size="large" color={theme.colors.text} animating={loading} />
+            {!loading && (
+              <>
+                <ThemedText type="default" style={{ marginTop: 10 }}>No results found</ThemedText>
+                <Pressable onPress={() => loadMore()} style={{ marginTop: 6 }}>
+                  <ThemedText type="link">Retry</ThemedText>
+                </Pressable>
+              </>
+            )}
+          </View>
         )}
         ListFooterComponent={renderFooter}
         onEndReached={() => hasNextPage && loadMore()}

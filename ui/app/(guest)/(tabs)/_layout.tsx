@@ -3,7 +3,6 @@ import React, { useMemo } from 'react';
 
 import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { useSession } from '@/context/ctx';
 import { useTheme } from '@/theme/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StyleSheet } from 'react-native';
@@ -13,7 +12,6 @@ const MemoizedMaterialCommunityIcons = React.memo(MaterialCommunityIcons);
 
 export default function TabLayout() {
   const {theme} = useTheme()
-  const {isLoading,session} = useSession()
 
   // Memoize screen options to prevent re-renders
   const screenOptions = useMemo(() => ({

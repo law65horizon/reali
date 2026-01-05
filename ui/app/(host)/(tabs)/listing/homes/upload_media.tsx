@@ -303,7 +303,7 @@
 import { ThemedText } from '@/components/ThemedText'
 import { ThemedView } from '@/components/ThemedView'
 import PreviousNextUI from '@/components/ui/PreviousNextUI'
-import { useHomeStore } from '@/store/homeStore'
+import { useHomeStore } from '@/stores/homeStore'
 import { useTheme } from '@/theme/theme'
 import { ImageProps } from '@/types/type'
 import { Entypo, MaterialCommunityIcons } from '@expo/vector-icons'

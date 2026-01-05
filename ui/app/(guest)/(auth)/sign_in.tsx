@@ -1,7 +1,6 @@
 // SignUpScreen.js
 import { ThemedText } from '@/components/ThemedText';
 import FormField from '@/components/ui/FormField';
-import { useSession } from '@/context/ctx';
 import { useTheme } from '@/theme/theme';
 import { router, useNavigation } from 'expo-router';
 import React, { useState } from 'react';
@@ -25,7 +24,6 @@ export default function SignUpScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const navigation = useNavigation() 
   const {theme} = useTheme()
-  const { signIn: setSession } = useSession()
   const [form, setForm] = useState({
     email: '',
     password: '',

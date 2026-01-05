@@ -1,7 +1,7 @@
 import { ThemedText } from '@/components/ThemedText'
 import { ThemedView } from '@/components/ThemedView'
 import PreviousNextUI from '@/components/ui/PreviousNextUI'
-import { useFormStore } from '@/store/homeStore'
+import { useFormStore } from '@/stores/homeStore'
 import { useTheme } from '@/theme/theme'
 import { router } from 'expo-router'
 import React, { useState } from 'react'

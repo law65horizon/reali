@@ -1,20 +1,22 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Line } from '@/components/ui/Line';
-import { useSession } from '@/context/ctx';
-import { signOut } from '@/lib/appwrite';
+import { LOGOUT } from '@/graphql/mutations';
+import { useAuthStore } from '@/stores/authStore';
 import { useTheme } from '@/theme/theme';
+import { useMutation } from '@apollo/client';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Briefcase, FileText, Gift, CircleHelp as HelpCircle, Chrome as HomeIcon, Lock, LogOut, Settings, Share, User, UserPlus, Users } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { Dimensions, ScrollView, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, ScrollView, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 
 export default function ProfileTab() {
   const [accountExpanded, setAccountExpanded] = useState(true);
   const {theme} = useTheme()
-  const {session, isLoading, signOut: removeSession, updateSession} = useSession()
+  const {isAuthenticated, isLoading, mode, switchMode, refreshToken} = useAuthStore()
+  const [signOut, {loading: signingOut}] = useMutation(LOGOUT)
   const {height, width} = Dimensions.get('screen')
 
   const menuItems: any = [
@@ -25,21 +27,18 @@ export default function ProfileTab() {
 
   const logout = async () => {
     console.log('working')
-    await signOut();
-    removeSession()
 
-    // router.replace("/sign-in");
-  };
+    try {
+      useAuthStore.getState().clearAuth()
+      // const {data} = await signOut({variables: {refreshToken}})
 
-  const switchMode = (mode:string) => {
-    if(session) {
-      updateSession({...session, mode})
+      // Alert.alert('Success', data.logout.message);
+    } catch (error:any) {
+        Alert.alert('Error', error.message);
     }
-    // updateSession({...session, mode: 'guest'})
-    // router.replace("/sign-in");
   };
 
-  if(!session && !isLoading) {
+  if(!isAuthenticated && !isLoading) {
     return(
       <ThemedView plain secondary style={[styles.container, {paddingVertical: 30, height}]}>
       <StatusBar barStyle="dark-content" />
@@ -70,10 +69,10 @@ export default function ProfileTab() {
   return (
     <ThemedView plain secondary>
       <View style={{position:'absolute', bottom: 90, left: 0, zIndex:1, width, justifyContent: 'center', alignItems: 'center',}}>
-        <TouchableOpacity onPress={() => session?.mode === 'host' ? switchMode('guest'): switchMode('host') } style={[styles.hostingButton, {backgroundColor: theme.colors.accent}]}>
+        <TouchableOpacity onPress={() => mode === 'host' ? switchMode('guest'): switchMode('host') } style={[styles.hostingButton, {backgroundColor: theme.colors.accent}]}>
               <HomeIcon size={20} color={theme.colors.background} />
               <ThemedText style={[styles.hostingButtonText, {color: theme.mode === 'light'? 'white': 'black'}]}>
-               Switch to {session?.mode === 'guest' ? 'Host': 'Guest' }
+               Switch to {mode === 'guest' ? 'Host': 'Guest' }
               </ThemedText>
         </TouchableOpacity>
       </View>

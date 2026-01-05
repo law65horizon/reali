@@ -1,8 +1,8 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Line } from '@/components/ui/Line';
-import { useSession } from '@/context/ctx';
 import { signOut } from '@/lib/appwrite';
+import { useAuthStore } from '@/stores/authStore';
 import { useTheme } from '@/theme/theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -14,7 +14,7 @@ import { Dimensions, ScrollView, StatusBar, StyleSheet, TouchableOpacity, View }
 export default function ProfileTab() {
   const [accountExpanded, setAccountExpanded] = useState(true);
   const {theme} = useTheme()
-  const {session, isLoading, signOut: removeSession, updateSession} = useSession()
+  const {isAuthenticated, isLoading, mode, switchMode} = useAuthStore()
   const {height, width} = Dimensions.get('screen')
 
   const menuItems: any = [
@@ -25,25 +25,21 @@ export default function ProfileTab() {
 
   const logout = async () => {
     console.log('working')
-    try {
-      await signOut();
-      removeSession()
-    } catch (error) {
-      console.error(error)
-    }
+    await signOut();
+    // removeSession()
 
     // router.replace("/sign-in");
   };
 
-  const switchMode = (mode:string) => {
-    if(session) {
-      updateSession({...session, mode})
-    }
-    // updateSession({...session, mode: 'guest'})
-    // router.replace("/sign-in");
-  };
+  // const switchMode = (mode:string) => {
+  //   if(session) {
+  //     updateSession({...session, mode})
+  //   }
+  //   // updateSession({...session, mode: 'guest'})
+  //   // router.replace("/sign-in");
+  // };
 
-  if(!session && !isLoading) {
+  if(!isAuthenticated && !isLoading) {
     return(
       <ThemedView plain secondary style={[styles.container, {paddingVertical: 30, height}]}>
       <StatusBar barStyle="dark-content" />
@@ -74,10 +70,10 @@ export default function ProfileTab() {
   return (
     <ThemedView plain secondary>
       <View style={{position:'absolute', bottom: 90, left: 0, zIndex:1, width, justifyContent: 'center', alignItems: 'center',}}>
-        <TouchableOpacity onPress={() => session?.mode === 'host' ? switchMode('guest'): switchMode('host') } style={[styles.hostingButton, {backgroundColor: theme.colors.accent}]}>
+        <TouchableOpacity onPress={() => mode === 'host' ? switchMode('guest'): switchMode('host') } style={[styles.hostingButton, {backgroundColor: theme.colors.accent}]}>
               <HomeIcon size={20} color={theme.colors.background} />
               <ThemedText style={[styles.hostingButtonText, {color: theme.mode === 'light'? 'white': 'black'}]}>
-               Switch to {session?.mode === 'guest' ? 'Host': 'Guest' }
+               Switch to {mode === 'guest' ? 'Host': 'Guest' }
               </ThemedText>
         </TouchableOpacity>
       </View>

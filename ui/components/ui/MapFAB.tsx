@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Dimensions,
-  StyleSheet,
-  View,
-  ViewProps
+    ActivityIndicator,
+    Dimensions,
+    StyleSheet,
+    View,
+    ViewProps
 } from 'react-native';
 
-import { useFormStore } from '@/store/homeStore';
+import { useFormStore } from '@/stores/homeStore';
 import { useTheme } from '@/theme/theme';
 import WebView from 'react-native-webview';
 

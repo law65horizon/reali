@@ -3,7 +3,7 @@
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { useHomeStore } from '@/store/homeStore';
+import { useHomeStore } from '@/stores/homeStore';
 import { useTheme } from '@/theme/theme';
 import { ImageProps } from '@/types/type';
 import { gql, useMutation } from '@apollo/client';

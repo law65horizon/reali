@@ -4,12 +4,11 @@ import { ThemedView } from '@/components/ThemedView'
 import Card from '@/components/ui/Card'
 import ImageCarousel from '@/components/ui/ImageCarousel'
 import { Line } from '@/components/ui/Line'
-import { ContactListItem } from '@/components/ui/ShimmerView'
 import { useTheme } from '@/theme/theme'
 import { FontAwesome5, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import React, { useCallback, useState } from 'react'
-import { Dimensions, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Dimensions, FlatList, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
 const { width, height } = Dimensions.get('screen');
 
@@ -47,8 +46,8 @@ export default function Saved() {
                                   <ImageCarousel imageHeight={240} width={width-40} images={images} modal />
                                 </View>
     
-                                <Pressable onPress={() => router.push( item < 2 ? '/(guest)/(modals)/experienceDetail/[query]' : '/(guest)/(modals)/listing/[listing]' )} style={styles.cardContent}>
-                                {/* <Pressable onPress={() => router.push('/(guest)/(modals)/listing/[listing]')} style={styles.cardContent}> */}
+                                {/* <Pressable onPress={() => router.push( item < 2 ? '/(guest)/(modals)/experienceDetail/[query]' : '/(guest)/(modals)/listing/[listing]' )} style={styles.cardContent}> */}
+                                <Pressable onPress={() => router.push({pathname: '/(guest)/(modals)/experienceDetail/[query]', params: {query: "2"}})} style={styles.cardContent}>
                                     <View style={styles.propertyInfo}>
                                         <ThemedText type='defaultSemiBold' style={styles.propertyTitle}>Room in {item?.address?.city|| 'USA'}</ThemedText>
                                         <View style={styles.ratingContainer}>
@@ -159,9 +158,9 @@ export default function Saved() {
             </View>
         </View>
 
-        <ContactListItem  />
+        {/* <ContactListItem  /> */}
 
-        {/* <FlatList
+        <FlatList
             data={[1,2,3,4,5]}
             renderItem={renderItem}
             keyExtractor={(item) => item.toString()}
@@ -179,7 +178,7 @@ export default function Saved() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{paddingTop: 0, paddingBottom: 150, paddingHorizontal: 10}}
             ListFooterComponentStyle={{padding: 15}}
-        /> */}
+        />
     </ThemedView>
   )
 }

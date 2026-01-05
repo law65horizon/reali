@@ -1,5 +1,5 @@
 import { ThemedText } from "@/components/ThemedText";
-import { useExperienceStore } from "@/store/experienceStore";
+import { useExperienceStore } from "@/stores/experienceStore";
 import { View } from "react-native";
 
 

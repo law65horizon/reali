@@ -1,6 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image, ImageStyle } from 'expo-image';
-import { router } from 'expo-router';
 import { memo, useState } from 'react';
 import { Dimensions, DimensionValue, FlatList, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import ImageModal from './ImageModal';
@@ -37,14 +36,14 @@ const ImageCarousel = ({ imageHeight, width, images, showNumber, modal, style, u
           renderItem={({ item, index }) => (
             <View>
               <Pressable
-                onPress={() => {
-                  if (modal) {
-                    setSelectedImageIndex(index); // Set the clicked image index
-                    setShowImageModal(true);
-                  } else {
-                    router.push('/(guest)/(modals)/listing/[listing]');
-                  }
-                }}
+                // onPress={() => {
+                //   if (modal) {
+                //     setSelectedImageIndex(index); // Set the clicked image index
+                //     setShowImageModal(true);
+                //   } else {
+                //     router.push('/(guest)/(modals)/listing/[listing]');
+                //   }
+                // }}
                 style={{
                   borderTopLeftRadius: showNumber ? borderRadius : 12,
                   borderTopRightRadius: showNumber ? borderRadius : 12,
@@ -90,7 +89,7 @@ const ImageCarousel = ({ imageHeight, width, images, showNumber, modal, style, u
                     horizontal
                     pagingEnabled
                   >
-                    {Array.from({ length: images.length }, (_, indexs) => (
+                    {images.length > 1 && Array.from({ length: images.length }, (_, indexs) => (
                       <MaterialCommunityIcons
                         key={indexs}
                         name="circle"

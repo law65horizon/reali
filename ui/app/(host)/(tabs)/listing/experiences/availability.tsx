@@ -2,7 +2,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import InputField from '@/components/ui/InputField';
 import PreviousNextUI from '@/components/ui/PreviousNextUI';
-import { useExperienceStore } from '@/store/experienceStore';
+import { useExperienceStore } from '@/stores/experienceStore';
 import { useTheme } from '@/theme/theme';
 import { Activity, EventDay } from '@/types/type';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -12,14 +12,14 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  Dimensions,
-  FlatList,
-  Modal,
-  Pressable,
-  StyleSheet,
-  TouchableOpacity,
-  View
+    Alert,
+    Dimensions,
+    FlatList,
+    Modal,
+    Pressable,
+    StyleSheet,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { EventRegister } from 'react-native-event-listeners';
 

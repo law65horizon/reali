@@ -1,21 +1,21 @@
 import PreviousNextUI from "@/components/ui/PreviousNextUI";
-import { useExperienceStore } from "@/store/experienceStore";
+import { useExperienceStore } from "@/stores/experienceStore";
 import { useTheme } from "@/theme/theme";
 import * as Location from "expo-location";
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Dimensions,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Dimensions,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { EventRegister } from "react-native-event-listeners";
 import Animated, { SlideInUp, SlideOutDown } from "react-native-reanimated";

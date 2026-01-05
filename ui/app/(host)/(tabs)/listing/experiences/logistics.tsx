@@ -4,21 +4,21 @@ import Card from '@/components/ui/Card';
 import InputField from '@/components/ui/InputField';
 import { Line } from '@/components/ui/Line';
 import PreviousNextUI from '@/components/ui/PreviousNextUI';
-import { useExperienceStore } from '@/store/experienceStore';
+import { useExperienceStore } from '@/stores/experienceStore';
 import { useTheme } from '@/theme/theme';
 import { Entypo, MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  Dimensions,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Dimensions,
+    Modal,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 const { width, height } = Dimensions.get('screen');

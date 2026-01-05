@@ -3,7 +3,6 @@ import React, { useCallback, useMemo } from 'react';
 import { Dimensions, StyleSheet, View } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
 import RangeSlider from 'rn-range-slider';
-import { ThemedText } from '../ThemedText';
 import InputField from './InputField';
 // import InputField from './InputField';
 
@@ -13,15 +12,16 @@ type Props = {
   values: { min: number; max: number };
   onChange: (values: { min: number; max: number }) => void;
   showChart?: boolean
+  histogramData?: number[]
 };
 
-const CustomPriceRangeSlider: React.FC<Props> = ({ min, max, values, showChart, onChange }) => {
+const CustomPriceRangeSlider: React.FC<Props> = ({ min, max, values, showChart, onChange, histogramData=[] }) => {
   const screenWidth = Dimensions.get('window').width;
   const {theme } = useTheme()
   
-  const histogramData = [
-    2, 3, 5, 10, 15, 18, 25, 30, 35, 38, 40, 42, 40, 36, 30, 25, 20, 15, 10, 5, 42, 40, 36, 30, 25, 11 
-  ];
+  // const histogramData = [
+  //   2, 3, 5, 10, 15, 18, 25, 30, 35, 38, 40, 42, 40, 36, 30, 25, 20, 15, 10, 5, 42, 40, 36, 30, 25, 11 
+  // ];
 
   const barWidth = 8;
   const maxBarHeight = 100;
@@ -83,7 +83,6 @@ const CustomPriceRangeSlider: React.FC<Props> = ({ min, max, values, showChart, 
 
   return (
     <View style={styles.container}>
-      <ThemedText style={styles.title}>Price range</ThemedText>
       {/* <Text style={styles.subtitle}>Trip price;, includes all fees</Text> */}
 
       {showChart && <View style={styles.chartWrapper}>

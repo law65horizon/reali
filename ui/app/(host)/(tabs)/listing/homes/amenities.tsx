@@ -1,7 +1,7 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import PreviousNextUI from '@/components/ui/PreviousNextUI';
-import { useHomeStore } from '@/store/homeStore';
+import { useHomeStore } from '@/stores/homeStore';
 import { useTheme } from '@/theme/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useNavigation } from 'expo-router';

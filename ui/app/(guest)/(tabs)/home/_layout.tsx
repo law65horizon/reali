@@ -26,6 +26,7 @@ export default function HomeTabLayout() {
       {/* <Stack.Screen name='listing/[listing]' options={{headerShown: false, animation: 'fade'}}/> */}
       {/* <Stack.Screen name='listing/[listing]' options={{headerShown: false, presentation: 'fullScreenModal', animation: 'fade'}}/> */}
       <Stack.Screen name='(search)/[query]' options={{headerShown: false}}/>
+      
     </Stack>
     );
 }

@@ -1,11 +1,9 @@
 import DraggableModal from '@/components/DraggableModal';
-import { FeatureIcon } from '@/components/FeatureIcon';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import Button from '@/components/ui/Button';
 import ImageCarousel from '@/components/ui/ImageCarousel';
 import { Line } from '@/components/ui/Line';
-import PropertiesFeatures from '@/components/ui/PropertiesFeatures';
 import StarRating from '@/components/ui/StarRating';
 import { useTheme } from '@/theme/theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -51,7 +49,7 @@ export default function ListingDetail() {
   const lastScrollY = useRef(0);
   const isPulling = useRef(false);
 
-  console.log(lastScrollY.current, )
+  console.log(lastScrollY.current, 'isoisois')
   
   const scale = scrollY.interpolate({
     inputRange: [-100, 0], // Zoom out when pulling up to -100 pixels
@@ -112,7 +110,7 @@ export default function ListingDetail() {
             <Ionicons name="arrow-back" color={'black'} size={22} />
           </TouchableOpacity>
           <View style={{ alignItems: 'center', gap: 10, flexDirection: 'row' }}>
-            <TouchableOpacity style={[styles.icon, { backgroundColor: theme.mode == 'dark' ? 'rgba(197, 202, 209, 0.76)': 'rgba(245, 247, 250, 0.76)'  }]}>
+            <TouchableOpacity onPress={() => router.push('/(guest)/(modals)/experienceDetail/[query]')} style={[styles.icon, { backgroundColor: theme.mode == 'dark' ? 'rgba(197, 202, 209, 0.76)': 'rgba(245, 247, 250, 0.76)'  }]}>
               <Ionicons name="share-outline" color={'black'} size={22}/>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.icon, { backgroundColor: theme.mode == 'dark' ? 'rgba(197, 202, 209, 0.76)': 'rgba(245, 247, 250, 0.76)'  }]}>
@@ -245,17 +243,17 @@ export default function ListingDetail() {
             <View>
               <ThemedText style={styles.sectionTitle}>What this place offers</ThemedText>
               <View style={styles.amenities}>
-                <FeatureIcon feature='wifi' />
+                {/* <FeatureIcon feature='wifi' />
                 <FeatureIcon feature='airConditioning' />
                 <FeatureIcon feature='gym' />
                 <FeatureIcon feature='parking' />
-                <FeatureIcon feature='pool' />
+                // <FeatureIcon feature='pool' /> */}
               </View>
               <TouchableOpacity onPress={() => showFeaturesModal(true)} style={{marginTop: 10, alignItems:'center', justifyContent:'center', borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12, backgroundColor: theme.colors.backgroundSec}}>
                 <ThemedText type='defaultSemiBold' >Show all 36 amenities</ThemedText>
               </TouchableOpacity>
 
-              <PropertiesFeatures pid='1' isVisible={featuresModal} setModalVisible={showFeaturesModal} />
+              {/* <PropertiesFeatures pid='1' isVisible={featuresModal} setModalVisible={showFeaturesModal} /> */}
             </View>
 
             {/* Where you'll be */}

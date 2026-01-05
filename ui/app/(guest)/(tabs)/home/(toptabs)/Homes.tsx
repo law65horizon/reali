@@ -1,200 +1,222 @@
 import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
 import Card from '@/components/ui/Card';
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import { useSectionedProperties } from '@/hooks/useProperties';
+import ImageCarousel from '@/components/ui/ImageCarousel';
+import { useAuthStore } from '@/stores/authStore';
 import { useTheme } from '@/theme/theme';
-import { Image } from 'expo-image';
-import { router } from 'expo-router';
-import React, { memo, useCallback, useContext } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, NativeScrollEvent, NativeSyntheticEvent, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { HideIconContext } from './HideIconContext';
-// import HomesTab from '@/app/(host)/(tabs)/home/(toptabs)/Homes';
+import { Entypo, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useMemo } from 'react';
+import { Dimensions, FlatList, ScrollView, StyleSheet, View } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
-const ExperienceItem = memo(({ item, index, section, theme }: any) => (
-  // <Link
-  //   href={{
-  //     pathname: '/(guest)/(modals)/listing/[listing]',
-  //     params: { listing: item.id }, // Use experience ID
-  //   }}
-  //   asChild
-  // >
-    <View style={{ marginLeft: index === 0 ? 16 : 0 }}>
-      <Card style={styles.propertyCard} elevated onPress={() => router.push(`/listing/${item.id}`)}>
-        <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: 'https://res.cloudinary.com/dajzo2zpq/image/upload/v1752247182/properties/wlf2uijbultztvqptnka.jpg' }}
-            style={styles.propertyImage}
-            contentFit="cover"
-            cachePolicy="disk"
-            priority="normal"
-            transition={200}
-          />
-          <View style={styles.imageOverlay}>
-            {item.tag?.length > 3 && (
-              <View style={styles.badgeContainer}>
-                <ThemedText  style={styles.badgeText}>{item.tag}</ThemedText>
-              </View>
-            )}
-            <Pressable style={styles.heartButton} onPress={() => {}}>
-              <IconSymbol name="heart" style={styles.heartIcon} size={24} color="white" />
-            </Pressable>
-          </View>
-        </View>
-        <View style={styles.propertyDetails}>
-          <ThemedText type="defaultSemiBold" style={styles.propertyTitle}>
-            {item.name}
-          </ThemedText>
-          <ThemedText type="caption" secondary>{item.location}</ThemedText>
-          <View style={styles.propertyFooter}>
-            <ThemedText type="caption" secondary>from ${item.price}</ThemedText>
-            <View style={styles.ratingContainer}>
-              <IconSymbol name="star.fill" size={12} color={theme.colors.warning} />
-              <ThemedText type="caption" secondary>{item.rating}</ThemedText>
+type Property = any;
+
+type MixedRow =
+  | { kind: 'property'; item: Property }
+  | { kind: 'featured'; items: Property[]; title: string };
+
+  const FALLBACK_IMAGES = [
+    'https://res.cloudinary.com/dajzo2zpq/image/upload/v1752247182/properties/wlf2uijbultztvqptnka.jpg',
+    'https://res.cloudinary.com/dajzo2zpq/image/upload/v1752247182/properties/wlf2uijbultztvqptnka.jpg',
+    'https://res.cloudinary.com/dajzo2zpq/image/upload/v1752247182/properties/wlf2uijbultztvqptnka.jpg',
+  ];
+
+const PropertyCard = ({ property, width_ }: { property: Property, width_?: number }) => {
+  const { theme } = useTheme();
+
+  const price = property?.price ?? 0;
+  const city = property?.address?.city || 'Unknown';
+  const country = property?.address?.country || '';
+  const type = (property?.category || property?.type || 'Home') as string;
+
+  const beds = property?.beds ?? ((price % 3) + 2);
+  const baths = property?.baths ?? ((price % 2) + 1);
+  const sqft = property?.sqft ?? (900 + (price % 5) * 120);
+
+  const tags: string[] = useMemo(() => {
+    const t: string[] = [];
+    if (price && price < 100) t.push('Deal');
+    if ((property?.images?.length || 0) > 1) t.push('3D Walkthrough');
+    if ((property?.status || 'ACTIVE') === 'PENDING') t.push('New');
+    return t;
+  }, [price, property]);
+
+  const images = (property?.images?.map((i: any) => i.url) || FALLBACK_IMAGES) as any;
+
+  return (
+    <Card elevated style={[styles.card, { backgroundColor: theme.colors.backgroundSec }]}>
+      <ImageCarousel images={FALLBACK_IMAGES} imageHeight={220} width={width_ || width - 20} uri />
+
+      <View style={styles.cardBody}>
+        <View style={{flexDirection:'row', alignItems: 'center'}}>
+          <View style={{flex:1}}>
+            <ThemedText type="defaultSemiBold" style={styles.price}>
+              ${price?.toLocaleString?.() || price} {type === 'apartment' ? 'mo' : ''}
+            </ThemedText>
+
+            <View style={styles.row}>
+              <ThemedText type="body" secondary>{beds} beds</ThemedText>
+              <View style={styles.dot} />
+              <ThemedText type="body" secondary>{baths} baths</ThemedText>
+              <View style={styles.dot} />
+              <ThemedText type="body" secondary>{sqft} sq.ft</ThemedText>
             </View>
           </View>
+          <View style={{flexDirection:'row', gap: 5}}>
+            <Entypo
+              name={true ? 'heart' : 'heart-outlined'}
+              color={true ? theme.colors.primary : theme.colors.text}
+              size={26} 
+            />
+            {/* <Entypo name="share-alternative" color={theme.colors.text} size={24} /> */}
+          </View>
         </View>
-      </Card>
-    </View>
-  // </Link> 
-));
+
+        <View style={styles.rowBetween}>
+          <View style={styles.row}>
+            <MaterialCommunityIcons name="map-marker" size={16} color={theme.colors.textSecondary} />
+            <ThemedText type="caption" secondary>{city}{country ? `, ${country}` : ''}</ThemedText>
+          </View>
+          <View style={[styles.typePill, { backgroundColor: theme.colors.border }]}> 
+            <ThemedText type="caption">{type.charAt(0).toUpperCase() + type.slice(1)}</ThemedText>
+          </View>
+        </View>
+
+        
+      </View>
+      {!!tags.length && (
+          <View style={{position:'absolute', top: 8, left: 8, flexDirection: 'row', gap: 10}}>
+            {tags.map((t, idx) => (
+              <View key={`${property.id}-tag-${idx}`} style={[styles.tag, { backgroundColor: theme.colors.background }]}> 
+                <ThemedText type="caption">{t}</ThemedText>
+              </View>
+            ))}
+          </View>
+        )}
+    </Card>
+  );
+};
 
 function HomesTab() {
   const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
-  const { setHideIcons } = useContext(HideIconContext);
-  const { sections, loading, error, loadMore, hasNextPage, networkStatus } = useSectionedProperties();
+  // const { data: properties, loading } = useProperties();
+  // console.log(properties)
+  const properties: any = []
 
-  const onScroll = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      setHideIcons(e.nativeEvent.contentOffset.y > 0);
-    },
-    [setHideIcons]
-  );
+  const cityKey = properties?.[0]?.address?.city;
+  console.warn(cityKey)
 
-  const renderItem = useCallback(
-    ({ item, index }: any) => {
-      if (item.type === 'header') {
-        return (
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionHeaderText, { color: theme.colors.text }]}>
-              Homes in {item.title}
-            </Text>
-            <IconSymbol name="chevron.forward" style={styles.chevron} size={18} color={theme.colors.text} />
-          </View>
-        );
-      } else {
-        return (
-          <FlatList
-            data={item.data}
-            renderItem={({ item: experience, index }) => (
-              <ExperienceItem item={experience} index={index} section={item} theme={theme} />
-            )}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            initialNumToRender={3}
-            maxToRenderPerBatch={3}
-            windowSize={3}
-            getItemLayout={(data, index) => ({
-              length: 170,
-              offset: 170 * index,
-              index,
-            })}
-            keyExtractor={(item, index) => item.id ? String(item.id) : `item-${index}`}
-          />
-        );
+  const {isAuthenticated, isLoading, mode, accessToken, loadAuth} = useAuthStore()
+  // loadAuth
+  // console.warn({isAuthenticated, isLoading, accessToken, mode})
+
+  const mixed: MixedRow[] = useMemo(() => {
+    const list: MixedRow[] = [];
+    if (!properties?.length) return list;
+
+    const sameCity = properties.filter((p: any) => p.address?.city === cityKey);
+    const others = properties.filter((p: any) => p.address?.city !== cityKey);
+
+    sameCity.forEach((p: any, idx: number) => {
+      list.push({ kind: 'property', item: p });
+      if ((idx + 1) % 3 === 0) {
+        const slice = properties.slice(0, 6);
+        list.push({ kind: 'featured', items: slice, title: 'Featured near you' });
       }
-    },
-    [theme]
+    });
+
+    others.forEach((p: any, idx: number) => {
+      if (idx === 0) list.push({ kind: 'featured', items: properties.slice(3, 9), title: 'Popular picks' });
+      list.push({ kind: 'property', item: p });
+    });
+    return list;
+  }, [properties, cityKey]);
+
+  const renderFeatured = (title: string, items: Property[]) => (
+    <View style={{ gap: 8 }}>
+      <ThemedText type="subtitle" style={{ paddingHorizontal: 16 }}>{title}</ThemedText>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}>
+        {items.map((it: any) => (
+          <View key={`featured-${it.id}`} style={{ width: Math.min(280, width * 0.72) }}>
+            <PropertyCard property={it} width_={Math.min(280, width * 0.72)} />
+          </View>
+        ))}
+      </ScrollView>
+    </View>
   );
-
-  const renderFooter = useCallback(() => {
-    if (!hasNextPage) return null;
-    return (
-      <View style={styles.footer}>
-        {(loading || networkStatus === 3) && <ActivityIndicator size="large" color={theme.colors.text} />}
-      </View>
-    );
-  }, [loading, hasNextPage, theme.colors.text, networkStatus]);
-
-  const getItemLayout = useCallback(
-    (data: any, index: number) => {
-      const isHeader = data[index]?.type === 'header';
-      return {
-        length: isHeader ? 48 : 180,
-        offset: data?.slice(0, index).reduce((sum: number, item: any) => sum + (item.type === 'header' ? 48 : 180), 0) || 0,
-        index,
-      };
-    },
-    []
-  );
-
-  if (error) {
-    return (
-      <ThemedView style={styles.container}>
-        <ThemedText type="defaultSemiBold" style={{ color: 'red', textAlign: 'center', marginTop: 20 }}>
-          Error: {error}
-        </ThemedText>
-      </ThemedView>
-    );
-  }
 
   return (
-    <ThemedView style={[styles.container, { paddingTop: 10, backgroundColor: theme.colors.background }]}>
-    {/* <ThemedView style={[styles.container, { paddingTop: insets.top }]}> */}
-      <FlatList
-        data={sections.length ? flattenData(sections) : []}
-        renderItem={renderItem}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-        initialNumToRender={5}
-        maxToRenderPerBatch={5}
-        windowSize={3}
-        getItemLayout={getItemLayout}
-        contentContainerStyle={[styles.flatListContent, { paddingBottom: insets.bottom + 100 }]}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        ListEmptyComponent={() => (
-          <ActivityIndicator style={{ flex: 1, marginTop: 50 }} size="large" color={theme.colors.text} animating={true} />
-        )}
-        ListFooterComponent={renderFooter}
-        onEndReached={() => hasNextPage && loadMore()}
-        onEndReachedThreshold={0.5}
-        keyExtractor={(item, index) => item.type === 'header' ? `header-${item.title}` : `items-${item.title}`}
-      />
-    </ThemedView>
+    <FlatList
+      data={mixed}
+      keyExtractor={(row, index) => ('kind' in row ? `${row.kind}-${index}` : `${index}`)}
+      // ListHeaderComponent={
+      //   <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
+      //     <ThemedText type="title">Homes</ThemedText>
+      //     <ThemedText type="caption" secondary>
+      //       {cityKey ? `Showing places in ${cityKey} first` : 'Recommended for you'}
+      //     </ThemedText>
+      //   </View>
+      // }
+      renderItem={({ item }) => {
+        if (item.kind === 'featured') {
+          return renderFeatured(item.title, item.items);
+        }
+        return (
+          <View style={{ paddingHorizontal: 12 }}>
+            <PropertyCard property={item.item} />
+          </View>
+        );
+      }}
+      ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+      contentContainerStyle={{ paddingBottom: 100, backgroundColor: theme.colors.background, paddingTop: 16 }}
+      refreshing={false}
+      onRefresh={() => {}}
+      showsVerticalScrollIndicator={false}
+    />
   );
 }
 
-const flattenData = (data: any) =>
-  data.reduce((acc: any, section: any) => {
-    return [...acc, { type: 'header', title: section.title }, { type: 'items', data: section.data, title: section.title }];
-  }, []);
-
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 0 },
-  flatListContent: { paddingBottom: 100 },
-  separator: { height: 3 },
-  sectionHeader: { paddingVertical: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  sectionHeaderText: { fontWeight: 'bold', fontSize: 16 },
-  chevron: { fontWeight: '900' },
-  propertyCard: { width: 170, padding: 0, marginRight: 12, borderRadius: 16, overflow: 'hidden' },
-  imageContainer: { position: 'relative', marginBottom: 8 },
-  propertyImage: { width: '100%', height: 140, borderRadius: 12 },
-  imageOverlay: { position: 'absolute', top: 8, left: 8, right: 8, flexDirection: 'row', justifyContent: 'space-between' },
-  // badgeContainer: { backgroundColor: 'red', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4 },
-  badgeContainer: { backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4,  height: 25 },
-  badgeText: { fontSize: 11, fontWeight: 'bold', color: '#000' },
-  heartButton: { padding: 4 },
-  heartIcon: { fontWeight: 'bold' },
-  propertyDetails: { gap: 0, paddingHorizontal: 8, paddingBottom: 8 },
-  propertyTitle: { fontSize: 13, lineHeight: 18 },
-  propertyFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
-  ratingContainer: { flexDirection: 'row', gap: 2 },
-  footer: { padding: 20, alignItems: 'center' },
+  card: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    width: '100%',
+    paddingLeft:0,
+    margin:0
+  },
+  cardBody: {
+    padding: 12,
+    gap: 6,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rowBetween: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dot: {
+    width: 3,
+    height: 3,
+    borderRadius: 3,
+    backgroundColor: 'rgba(140,140,140,0.6)',
+  },
+  price: {
+    fontSize: 18,
+  },
+  tag: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 999,
+  },
+  typePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
 });
 
 export default HomesTab;

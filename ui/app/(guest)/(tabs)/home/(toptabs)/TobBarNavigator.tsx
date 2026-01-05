@@ -30,17 +30,17 @@ const TopTabsNavigator = memo(function TopTabsNavigator({ headerHeight }: Props)
     // Memoize screen options to prevent re-renders
     const screenOptions = useMemo(
         () => ({
-            swipeEnabled: false,
+            swipeEnabled: true,
             lazy: true,
-            unmountOnBlur: true,
+            unmountOnBlur: false,
             tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
             tabBarInactiveTintColor: 'gray',
             tabBarStyle: {
                 borderWidth: 0,
                 // backgroundColor: 'red',
                 backgroundColor: 'transparent',
-                // height: 44,
-                height: hideIcons ? 38 : 58,
+                // keep height stable to avoid layout shifts
+                // height: 58,
                 width: tabBarWidth,
                 alignSelf: 'center' as const,
                 marginTop: 5,

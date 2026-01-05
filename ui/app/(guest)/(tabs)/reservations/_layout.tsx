@@ -22,6 +22,7 @@ export default function ReservationTabLayout() {
   return (
     <Stack>
       <Stack.Screen name='trips' options={{headerShown: false}}/>
+      <Stack.Screen name='details' options={{headerShown: false}}/>
     </Stack>
     );
 }
