@@ -11,8 +11,8 @@ export interface Context{
     pubsub: PubSub
 }
 
-export default async ({req}: {req: Request}): Promise<Context> => {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    const user = token ? await verifyToken(token) : undefined
-    return {req, user, pubsub }
-}
+// export default async ({req}: {req: Request}): Promise<Context> => {
+//     const token = req.headers.authorization?.replace('Bearer ', '');
+//     const user = token ? await verifyToken(token) : undefined
+//     return {req, user, pubsub }
+// }

@@ -84,7 +84,7 @@ export class UserModel {
       RETURNING id, name, email, uid, phone, description, created_at, address_id
     `;
     const userResult = await client.query(userQuery, [
-      user.name, address_id, user.email, user.uid, user.password, user.phone, user.description
+      user.name|| 'siosi', address_id, user.email, user.uid||'sioso', user.password, user.phone, user.description
     ]);
 
     await client.query('COMMIT');

@@ -13,6 +13,8 @@ const bookingSchema = fs.readFileSync(path.join(__dirname, 'booking.graphql'), '
 const messageSchema = fs.readFileSync(path.join(__dirname, 'message.graphql'), 'utf8');
 const reviewSchema = fs.readFileSync(path.join(__dirname, 'review.graphql'), 'utf8');
 const experienceSchema = fs.readFileSync(path.join(__dirname, 'experience.graphql'), 'utf8');
+const authSchema = fs.readFileSync(path.join(__dirname, 'auth.graphql'), 'utf8');
+const paymentSchema = fs.readFileSync(path.join(__dirname, 'payment.graphql'), 'utf8');
 
 export const typeDefs = gql`
   ${userSchema}
@@ -21,4 +23,6 @@ export const typeDefs = gql`
   ${messageSchema}
   ${reviewSchema}
   ${experienceSchema}
+  ${authSchema}
+  ${paymentSchema}
 `;

@@ -1,18 +1,18 @@
 import { Request, Response, NextFunction } from 'express'
 import { verifyToken } from '../services/auth.js'
 
-export const authMiddleWare = async (req:Request, res: Response, next: NextFunction) => {
-    try {
-        const token = req.headers.authorization?.replace('Bearer ', '')
-        if (token) {
-            const user = await verifyToken(token);
-            (req as any).user = user
-        }
-        next();
-    } catch (error) {
-        res.status(401).json({error: 'Unauthorized'})
-    }
-}
+// export const authMiddleWare = async (req:Request, res: Response, next: NextFunction) => {
+//     try {
+//         const token = req.headers.authorization?.replace('Bearer ', '')
+//         if (token) {
+//             const user = await verifyToken(token);
+//             (req as any).user = user
+//         }
+//         next();
+//     } catch (error) {
+//         res.status(401).json({error: 'Unauthorized'})
+//     }
+// }
 
 // import { verify } from "jsonwebtoken";
 // import { Request, Response, NextFunction } from "express";

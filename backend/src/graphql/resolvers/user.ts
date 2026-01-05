@@ -108,12 +108,12 @@ export const userLoader = new DataLoader(async (ids: number[]) => {
     FROM users
     WHERE id = ANY($1)
   `;
-  console.log(ids)
   const result = await UserModel.pool.query(query, [ids]);
   return ids.map(id => result.rows.find(row => row.id === id) || null);
 });
 
 export const addressLoader = new DataLoader(async (addressIds: (number | null)[]) => {
+  // console.log({iosiow: "iodieowi"})
   const validIds = addressIds.filter(id => id !== null) as number[];
   if (validIds.length === 0) return addressIds.map(() => null);
   const query = `
@@ -131,7 +131,7 @@ export const addressLoader = new DataLoader(async (addressIds: (number | null)[]
     WHERE a.id = ANY($1)
   `;
   const result = await AddressModel.pool.query(query, [validIds]);
-  console.log(result.rows)
+  // console.log(result.rows)
   return addressIds.map(id => id ? result.rows.find(row => row.id === id) || null : null);
 });
 
@@ -161,15 +161,13 @@ export default {
   },
   Mutation: {
     createUser: async (_: any, { input }: { input: User & { address: Address } }, __: any, info: any) => {
-      const requestedFields = getRequestedFields(info);
-      const hashedPassword = await hashPassword(input.password);
-      const user = await UserModel.create({ ...input, password: hashedPassword });
+      // const requestedFields = getRequestedFields(info);
+      // const hashedPassword = await hashPassword(input.password);
+      // const user = await UserModel.create({ ...input, password: hashedPassword });
+
+      const user = await createUser(input, info)
       // console.log(requestedFields.includes('address'))
-      if (requestedFields.includes('address')) {
-        const address = user.address_id ? await AddressModel.findById(user.address_id) : null;
-        console.log(address)
-        return { ...user, address };
-      }
+      
       return user;
     },
     updateUser: async (_: any, { id, input }: { id: string, input: User }, { user }: { user: User }, info: any) => {
@@ -189,3 +187,17 @@ export default {
     },
   },
 };
+
+export const createUser = async (input: User & { address: Address }, info: any) => {
+  const requestedFields = getRequestedFields(info);
+  const hashedPassword = await hashPassword("12345");
+  const user = await UserModel.create({ ...input, password: hashedPassword });
+
+  if (requestedFields.includes('address')) {
+    const address = user.address_id ? await AddressModel.findById(user.address_id) : null;
+    console.log(address)
+    return { ...user, address };
+  }
+  
+  return user
+}

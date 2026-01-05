@@ -12,85 +12,14 @@ import pool from './config/database.js';
 import { Context } from './graphql/context.js';
 import { pubsub } from './services/pubsub.js';
 import cors from "cors"
+import { createEmailTransporter } from './utils/emailTransport.js';
+import { error } from 'console';
+import jwt from 'jsonwebtoken';
+// import { authMiddleWare } from './middleware/auth.js';
+import { verifyToken } from './services/auth.js';
+import { createWebhookRouter } from './routes/createWebHook.js';
 
-// interface MyContext {
-//   token?: string;
-// }
 
-// interface User {
-//   id: number;
-//   name: string;
-//   email: string;
-//   password: string;
-//   phone?: string;
-//   description?: string;
-//   created_at: Date;
-// }
-
-// const typeDefs = gql`
-//   type User {
-//     id: ID!
-//     name: String!
-//     email: String!
-//     phone: String
-//     description: String
-//     createdAt: String!
-//   }
-
-//   input UserInput {
-//     name: String!
-//     email: String!
-//     password: String!
-//     phone: String
-//     description: String
-//   }
-
-//   type Query {
-//     getUser(id: ID!): User
-//     getUsers: [User!]!
-//   }
-
-//   type Mutation {
-//     createUser(input: UserInput!): User!
-//     updateUser(id: ID!, input: UserInput!): User!
-//     deleteUser(id: ID!): Boolean!
-//   }
-// `;
-
-// const resolvers = {
-//   Query: {
-//     getUser: async (_: any, { id }: { id: string }, { pool }: { pool: Pool }) => {
-//       const result = await pool.query('SELECT * FROM users WHERE id = $1', [parseInt(id)]);
-//       const user = result.rows[0];
-//       if (!user) return null;
-//       return {
-//         ...user,
-//         createdAt: user.created_at.toISOString(),
-//       };
-//     },
-//     getUsers: async (_: any, __: any, { pool }: { pool: Pool }) => {
-//       const result = await pool.query('SELECT * FROM users');
-//       return result.rows.map((user) => ({
-//         ...user,
-//         createdAt: user.created_at.toISOString(),
-//       }));
-//     },
-//   },
-//   Mutation: {
-//     createUser: async (_: any, { input }: { input: User }, { pool }: { pool: any }) => {
-//       const { name, email, password, phone, description } = input;
-//       const result = await pool.query(
-//         'INSERT INTO users (name, email, password, phone, description, created_at) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *',
-//         [name, email, password, phone, description]
-//       );
-//       const user = result.rows[0];
-//       return {
-//         ...user,
-//         createdAt: user.created_at.toISOString(),
-//       };
-//     },
-//   },
-// };
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -101,25 +30,53 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'x-apollo-operation-name'],
 }));
 
+app.use('/webhooks', createWebhookRouter(pool))
+
+app.use(express.json())
+
 const startServer = async () => {
   const server = new ApolloServer<Context>({
     typeDefs,
     resolvers,
     plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
     csrfPrevention: false,
+    formatError: (error) => {
+      console.error('GraphQl Error:', error)
+      return error
+    }
     // context: ({req}) => ({ pool, req, pubsub }),
   });
 
   try {
+    await createEmailTransporter()
     await connectDB();
     await server.start();
     console.log('Apollo Server started successfully');
+
+    // app.use(
+    //   '/',
+    //   express.json(),
+    //   expressMiddleware(server, {
+    //     context: async ({ req, }) => ({ req, pubsub, db: pool }),
+    //   })
+    // );
 
     app.use(
       '/',
       express.json(),
       expressMiddleware(server, {
-        context: async ({ req }) => ({ req, pubsub }),
+        context: async ({ req, }) => {
+          await new Promise<void>((resolve, reject) => {
+            verifyToken({ req, next: (err?: any) => (err ? reject(err) : resolve()) });
+          });
+
+          return {
+            req,
+            db: pool,
+            pubsub,
+            user: (req as any).user
+          }
+        },
       })
     );
 

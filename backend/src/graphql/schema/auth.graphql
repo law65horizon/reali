@@ -1,0 +1,69 @@
+type Address {
+    id: ID!
+    street: String!
+    city: String!
+    postal_code: String
+    country: String!
+    latitude: Float
+    longitude: Float
+}
+
+type User {
+  id: ID!
+  name: String!
+  uid: String!
+  email: String!
+  phone: String
+  description: String
+  created_at: String!
+  address_id: ID
+  address: Address
+}
+
+input UserInput {
+  name: String!
+  uid: String!
+  password: String!
+  phone: String
+  description: String
+  address: AddressInput
+}
+
+input AddressInput {
+    street: String!
+    city: String!
+    postal_code: String
+    country: String!
+    longitude: Float
+    latitude: Float
+}
+
+type AuthPayload {
+  accessToken: String!
+  refreshToken: String!
+  user: User!
+}
+
+type Query {
+  me: User
+}
+
+input VerifyCodeInput {
+  user: UserInput
+  email: String!
+  code: String!
+}
+
+type Mutation {
+  sendVerificationCode(email: String!): SendCodeResponse!
+  verifyCode(input: VerifyCodeInput!): AuthPayload!
+  refreshAccessToken(refreshToken: String!): AuthPayload!
+  logout(refreshToken: String!): Boolean!
+  updateProfile(fullName: String, phone: String): User!
+}
+
+type SendCodeResponse {
+  success: Boolean!
+  message: String!
+  previewUrl: String
+}

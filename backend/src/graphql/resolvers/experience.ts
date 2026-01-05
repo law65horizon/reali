@@ -169,7 +169,7 @@ export default {
     },
     getExperiences: async (_: any, __: any, ___: any, info: any) => {
       const requestedFields = getRequestedFields(info);
-      // console.log('getExperiences requestedFields:', requestedFields);
+      console.log('getExperiences requestedFields:', requestedFields);
       return await ExperienceModel.findAll(requestedFields);
     },
     getHostExperiences: async (_: any, { host_id }: { host_id: string }, { user }: { user: User }, info: any) => {
@@ -180,7 +180,7 @@ export default {
     },
     getExperiencesPaginated: async (_: any, { first, after }: { first: number; after?: string }, __: any, info: any) => {
       const requestedFields = getNodeFields(info);
-      // console.log('getExperiencesPaginated requestedFields:', requestedFields);
+      console.log('getExperiencesPaginated requestedFields:', requestedFields);
       return await ExperienceModel.findAllPaginated(first, after, requestedFields);
     },
     searchExperiences: async (_: any, { input, first, after }: { input: any; first: number; after?: string }, __: any, info: any) => {
