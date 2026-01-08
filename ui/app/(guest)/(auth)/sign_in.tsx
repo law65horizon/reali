@@ -1,66 +1,216 @@
 // SignUpScreen.js
 import { ThemedText } from '@/components/ThemedText';
 import FormField from '@/components/ui/FormField';
+import { LOGIN, SEND_VERIFICATION_CODE, VERIFY_CODE } from '@/graphql/mutations';
+import { useAuthStore } from '@/stores/authStore';
 import { useTheme } from '@/theme/theme';
+import { useMutation } from '@apollo/client';
 import { router, useNavigation } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View
 } from 'react-native';
-import { signIn } from '../../../lib/appwrite';
+import { OtpInput } from 'react-native-otp-entry';
 
-export default function SignUpScreen() {
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [dob, setDob] = useState(null);
-  const [showDobPicker, setShowDobPicker] = useState(false);
-  const [email, setEmail] = useState('');
+interface FormErrors {
+  email?: string
+}
+
+export default function SignInScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [step, setStep] = useState<'details' | 'code'>('details');
+  const [code, setCode] = useState('');
   const navigation = useNavigation() 
   const {theme} = useTheme()
+  const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({
     email: '',
     password: '',
   })
   const [touched, setTouched] = useState({
-    dob: false,
     email: false,
   });
+  const { setAuth } = useAuthStore();
+  
 
-  const onChangeDob = (event:any, selectedDate:any) => {
-    setShowDobPicker(Platform.OS === 'ios');
-    if (selectedDate) setDob(selectedDate);
-  };
+  const [login, {loading: loginIn, error: loginError}] = useMutation(LOGIN)
+  const [sendCode, { loading: sendingCode }] = useMutation(SEND_VERIFICATION_CODE);
+  const [verifyCode, { loading: verifying }] = useMutation(VERIFY_CODE);
 
-  const errors = {
-    dob: touched.dob && !dob ? 'Date of birth is required' : '',
-    email: touched.email && !email ? 'Email is required' : '',
-  };
+  const validateForm = useCallback((): FormErrors => {
+    const errors:FormErrors = {}
+
+    if (!form.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      errors.email = 'Invalid email format';
+    }
+
+    return errors;
+  }, [form])
+
+  const errors = validateForm()
 
   const onSubmit = async () => {
-    setTouched({ dob: true, email: true });
-    if ( !form.email) {
-        Alert.alert("Error", "Please fill in all fields");
-        return
+    setTouched({ email: true });
+
+    const errors = validateForm()
+    if (Object.keys(errors).length > 0) {
+      Alert.alert('Validation Error', Object.values(errors).join('/n'))
+      return;
     }
-    setIsSubmitting(true)
+
     try {
-        const result = await signIn(form.email, form.password)
-        // setSession(result)
-        if(navigation.canGoBack()){
-            navigation.goBack()
-            navigation.goBack()
-        }else router.replace('/(guest)/(tabs)/home/(toptabs)/Homes')
-    } catch (error:any) {
-        Alert.alert('Error', error.message)
+      const {data} = await login({
+        variables: {
+          email: form.email.toLocaleLowerCase().trim(),
+          password: form.password.trim(),
+          deviceInfo: 'sisoi'
+        }
+      })
+
+      if (data.login.success) {
+        await handleSendCode()
+      }
+    } catch (error) {
+      
     }
   };
+
+  const handleSendCode = useCallback(async () => {
+      console.log('wowo')
+      
+      try {
+        const { data } = await sendCode({
+          variables: { email: form.email.toLocaleLowerCase().trim() },
+        });
+  
+        if (data.sendVerificationCode.success) {
+          setStep('code');
+          Alert.alert('Success', data.sendVerificationCode.message);
+  
+          if (__DEV__ && data.sendVerificationCode.previewUrl) {
+            console.log('Email Preview:', data.sendVerificationCode.previewUrl);
+          }
+        }
+      } catch (error: any) {
+        Alert.alert('Error', error.message || 'Something went wrong');
+      }
+    }, [form, sendCode, validateForm]);
+  
+    const handleVerifyCode = useCallback(async () => {
+      if (code.length !== 6) {
+        Alert.alert('Error', 'Please enter the 6-digit code');
+        return;
+      }
+  
+      try {
+        const { data } = await verifyCode({
+          variables: {
+            input: {
+              email: form.email.toLowerCase().trim(),
+              code,
+              // firstName: form.firstName.trim(),
+              // lastName: form.lastName.trim(),
+              // dob: form.dob?.toISOString() ?? null,
+              // phone: form.phone.trim(),
+            },
+          },
+        });
+  
+        await setAuth(
+          data.verifyCode.accessToken,
+          data.verifyCode.refreshToken,
+          data.verifyCode.user,
+          data.verifyCode.user.role || 'guest'
+        );
+  
+        router.dismissAll();
+      } catch (error: any) {
+        Alert.alert('Error', error.message || 'Verification failed');
+        setCode('');
+      }
+    }, [code, form, setAuth, verifyCode]);
+
+  if (step === 'code') {
+      return (
+        <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: 20, paddingHorizontal: 20 }]}>
+          <ThemedText type='subtitle' >
+              Enter Verification Code
+            </ThemedText>
+            
+            <ThemedText type='body' style={{marginVertical: 10}}>
+              We sent a verification code to{'\n'}
+              <ThemedText style={{ fontWeight: '600' }}>{form.email}</ThemedText>
+            </ThemedText>
+          <View style={styles.codeContainer}>        
+            <OtpInput
+              numberOfDigits={6}
+              onTextChange={setCode}
+              theme={{
+          pinCodeContainerStyle: {
+                  width: 48,
+                  height: 56,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                  backgroundColor: theme.colors.backgroundInput,
+                },
+                pinCodeTextStyle: {
+                  fontSize: 24,
+                  fontWeight: '600',
+                  color: theme.colors.text,
+                },
+                focusedPinCodeContainerStyle: {
+                  borderColor: theme.colors.primary,
+                  borderWidth: 2,
+                },
+              }}
+            />
+  
+            <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>
+              Didn't receive the code?{' '}
+              <Text 
+                style={[styles.linkText, { color: theme.colors.primary }]}
+                onPress={handleSendCode}
+              >
+                {sendingCode ? 'Sending...' : 'Resend'}
+              </Text>
+            </Text>
+            
+            <TouchableOpacity
+              style={[
+                styles.button,
+                { backgroundColor: theme.colors.primary, justifyContent: 'flex-end' },
+                (verifying || code.length !== 6) && styles.buttonDisabled,
+              ]}
+              onPress={handleVerifyCode}
+              disabled={verifying || code.length !== 6}
+            >
+              {verifying ? (
+                <ActivityIndicator animating={verifying} color={theme.colors.buttonText} />
+              ) : (
+                <Text style={[styles.buttonText, { color: theme.colors.buttonText }]}>
+                  Verify & Continue
+                </Text>
+              )}
+            </TouchableOpacity>
+            
+            <TouchableOpacity onPress={() => alert('Change email')} style={styles.backButton}>
+              <Text style={[styles.linkText, { color: theme.colors.primary }]}>
+                Change Email
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )
+    }
 
   return (
     // <View style={styles.container}>
@@ -75,49 +225,53 @@ export default function SignUpScreen() {
           </View>
         </View>
         
-        {/* <View style={{ justifyContent:'center', height:}}> */}
-        {/* Email */}
-        {/* <Text style={[styles.label, { marginTop: 24 }]}>Email</Text> */}
         <FormField 
-          onPress={() => setShowDobPicker(false)}
           title='Email'
           otherStyles={[
             styles.input ,
-            errors.email ? styles.errorBorder: null   
+            touched && errors.email ? styles.errorBorder: null   
           ]}
-          placeholder='Email'
+          keyboardType='email-address'
           value={form.email}
-          handleChangeText={v => {
-            setForm({...form, email: v});
-            if (touched.email) setTouched(t => ({ ...t, email: true }));
-          }}
+          handleChangeText={(text) => setForm({...form, email: text})}
+          onBlur={() => setTouched((t) => ({...t, email: true}))}
         />
-        {errors.email ? (
+        {touched.email && errors.email ? (
           <Text style={styles.errorText}>{errors.email}</Text>
         ) : null} 
 
 
-        {/* <Text style={[styles.label, { marginTop: 24 }]}>Password</Text> */}
-        <FormField 
-          onPress={() => setShowDobPicker(false)}
+        <FormField
+          type='password' 
           title='Password'
           otherStyles={[
             styles.input ,
             errors.email ? styles.errorBorder: null   
           ]}
-          placeholder='Password'
           value={form.password}
           handleChangeText={v => {
             setForm({...form, password: v});
             if (touched.email) setTouched(t => ({ ...t, email: true }));
           }}
+          showPassword={showPassword}
+          switchShowPassword={() => setShowPassword(!showPassword)}
         />
         
+        {loginError && <Text style={[styles.errorText, {fontSize: 14}]}>{loginError.message}</Text>}
 
-        {/* Button */}
-        <TouchableOpacity style={[styles.button, {backgroundColor: theme.colors.background}]} onPress={onSubmit}>
-          <ThemedText type='defaultSemiBold'>Agree and continue</ThemedText>
-        </TouchableOpacity>
+        <TouchableOpacity
+            style={[styles.button, { backgroundColor: theme.colors.primary }]}
+            onPress={onSubmit}
+            disabled={loginIn}
+          >
+            {sendingCode ? (
+              <ActivityIndicator animating={loginIn}  color={theme.colors.buttonText ?? '#FFFFFF'} />
+            ) : (
+              <ThemedText type="defaultSemiBold" style={{ color: theme.colors.buttonText ?? '#FFFFFF' }}>
+                Agree and continue
+              </ThemedText>
+            )}
+          </TouchableOpacity>
 
         {/* Footer */}
         <Text style={styles.footer}>
@@ -132,6 +286,21 @@ export default function SignUpScreen() {
 }
 
 const styles = StyleSheet.create({
+  buttonDisabled: { opacity: 0.6 },
+  backButton: { marginTop: 30 },
+  helperText: {
+    fontSize: 14,
+    marginTop: 20,
+    marginBottom: 32,
+  },
+  linkText: {
+    fontWeight: '600',
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  codeContainer: { flex: 1, },
   container: { flex: 1, backgroundColor: '#fff' },
   inner: { padding: 16, paddingBottom: 40, },
   header: { flexDirection: 'row', alignItems: 'center' },
@@ -142,13 +311,12 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: 'row', justifyContent: 'space-between' },
   nameField: { flex: 1, marginRight: 8 },
   input: {
-    borderWidth: 1,
-    borderColor: '#CCC',
-    borderRadius: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    flex: 1,
+    borderWidth: 0,
+    // borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     fontSize: 16,
-    backgroundColor: '#FAFAFA',
   },
   pickerButton: {
     borderWidth: 1,
@@ -164,7 +332,7 @@ const styles = StyleSheet.create({
   hint: { fontSize: 12, color: '#555', marginTop: 8 },
   link: { color: '#007aff' },
   errorText: { color: '#D32F2F', fontSize: 12, marginTop: 4 },
-  errorBorder: { borderColor: '#D32F2F' },
+  errorBorder: { borderColor: '#EF4444' },
   terms: { fontSize: 12, color: '#555', marginTop: 32, lineHeight: 18 },
   button: {
     marginTop: 24,

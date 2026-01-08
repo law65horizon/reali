@@ -309,11 +309,6 @@ const refreshAccessToken = async () => {
             refreshAccessToken(refreshToken: $refreshToken) {
               accessToken
               refreshToken
-              user {
-                id
-                email
-                name
-              }
             }
           }
         `,
@@ -331,7 +326,8 @@ const refreshAccessToken = async () => {
       await useAuthStore.getState().setAuth(
         accessToken,
         refreshToken,
-        { id: user.id, email: user.email, name: user.name },
+        // { id: user.id, email: user.email, name: user.name },
+        {},
         'guest'
       );
 

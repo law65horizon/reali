@@ -2,6 +2,32 @@
 
 import { gql } from '@apollo/client';
 
+export const REGISTER = gql`
+  mutation Register($input: UserInput!) {
+    register(input: $input) {
+      success
+      message
+      user {
+        id
+        email
+      }
+    }
+  }
+`
+
+export const LOGIN = gql`
+  mutation Login($email: String!, $password: String!, $deviceInfo: String) {
+    login(email: $email, password: $password, deviceInfo: $deviceInfo) {
+      success
+      message
+      user {
+        id
+        email
+      }
+    }
+  }
+`
+
 export const SEND_VERIFICATION_CODE = gql`
   mutation SendVerificationCode($email: String!) {
     sendVerificationCode(email: $email) {

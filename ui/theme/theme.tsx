@@ -22,6 +22,9 @@ type Theme = {
     error: string;
     card: string;
     shadow: string;
+    backgroundInput: string;
+    textPlaceholder: string;
+    buttonText: string;
     // Add more colors as needed f0eee1
   };
   mode: ColorSchemeName;
@@ -46,6 +49,9 @@ const lightTheme: Theme = {
     error: '#EF4444',
     card: '#FFFFFF',
     shadow: '#000000',
+    backgroundInput: '#FAFAFA',
+    textPlaceholder: '#999999',
+    buttonText: '#FFFFFF',
   },
   mode: 'light',
 };
@@ -90,6 +96,9 @@ const darkTheme: Theme = {
     error: '#EF4444',
     card: '#1A1A1A',
     shadow: 'rgba(255, 255, 255, 0.06)',
+    backgroundInput: '#2A2A2A',
+    textPlaceholder: '#666666',
+    buttonText: '#FFFFFF',
   },
   mode: 'dark',
 };
@@ -186,3 +195,4 @@ export const useTheme = () => {
   }
   return context;
 };
+

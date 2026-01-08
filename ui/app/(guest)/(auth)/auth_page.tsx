@@ -52,7 +52,7 @@ const auth_page = () => {
         </View> */}
 
         <View style={{padding: 20, gap: 30, marginTop: 20}}>
-          <TouchableOpacity onPress={() => router.push('/(guest)/(auth)/auth_form')} style={{backgroundColor: theme.colors.primary, width: '100%', borderRadius: 10, height: 50, alignItems: 'center', justifyContent: 'center'}}>
+          <TouchableOpacity onPress={() => router.push('/(guest)/(auth)/sign_up')} style={{backgroundColor: theme.colors.primary, width: '100%', borderRadius: 10, height: 50, alignItems: 'center', justifyContent: 'center'}}>
             <ThemedText>Sign Up</ThemedText>
           </TouchableOpacity>
 

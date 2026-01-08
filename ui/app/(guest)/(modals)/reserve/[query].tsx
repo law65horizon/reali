@@ -2,6 +2,7 @@
 import DraggableModal from '@/components/DraggableModal';
 import { ThemedText } from '@/components/ThemedText';
 import { ErrorState } from '@/components/ui/StateComponents';
+import { useAuthStore } from '@/stores/authStore';
 import { useTheme } from '@/theme/theme';
 import { calculatePeriod } from '@/utils/calculatePeriod';
 import { getNightlyRatesInRange, RateCalendarEntry, sumNightlyRates } from '@/utils/getNightsInRange';
@@ -108,6 +109,7 @@ const ReservationScreen = () => {
   const navigation = useNavigation();
   const { query } = useLocalSearchParams();
   const stripe = useStripe()
+  const user = useAuthStore(state => state.user)
 
   const [checkInDate, setCheckInDate] = useState<string | null>(null);
   const [checkOutDate, setCheckOutDate] = useState<string | null>(null);
@@ -195,22 +197,22 @@ const ReservationScreen = () => {
     setLoading(true);
     try {
       const amountInCents = Math.round(pricingInfo.price * 100);
-      // const bookingResult = await createBooking({
-      //   variables: {
-      //     input: {
-      //       guestId: 2,
-      //       roomTypeId: query,
-      //       checkIn: checkInDate,
-      //       checkOut: checkOutDate,
-      //       guestCount: guests
-      //     }
-      //   }
-      // })
+      const bookingResult = await createBooking({
+        variables: {
+          input: {
+            guestId: user.id,
+            roomTypeId: query,
+            checkIn: checkInDate,
+            checkOut: checkOutDate,
+            guestCount: guests
+          }
+        }
+      })
 
       console.log({amountInCents})
 
-      // const bookingId = bookingResult.data?.createBooking?.booking?.id;
-      const bookingId = '37'
+      const bookingId = bookingResult.data?.createBooking?.booking?.id;
+      // const bookingId = '37'
       // console.log({ios: bookingResult.data?.createBooking?.booking})
       if (!bookingId) {
         return Alert.alert("Booking failed", "Booking could not be created.");

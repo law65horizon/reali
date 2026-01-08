@@ -1,7 +1,7 @@
 // screens/ListView.tsx
 import { PropertyCardSkeleton } from '@/components/ui/CardSkeleton';
 import PropertyCard from '@/components/ui/PropertyCard';
-import { EmptySearchState, ErrorState } from '@/components/ui/StateComponents';
+import { EmptySearchState } from '@/components/ui/StateComponents';
 import { usesearchRoomTypes } from '@/hooks/useSearchProp';
 import { useSearchStore } from '@/stores';
 import { useTheme } from '@/theme/theme';
@@ -158,7 +158,7 @@ export default function ListView() {
   }, [query]);
 
   // Use the properties hook with infinite scroll
-  const { properties:data, loading, hasMore: hasNextPage, fetchMore: loadMore, totalCount, isRefetching, refetch, error } = usesearchRoomTypes({pageSize: 20, skip: false});
+  const { properties:data, loading, hasMore: hasNextPage, fetchMore: loadMore, totalCount, isRefetching, refetch, error } = usesearchRoomTypes({pageSize: 10, skip: false});
 // console.log({dos: data[1]?.images})
 
   console.log({isRefetching})
@@ -227,9 +227,9 @@ export default function ListView() {
     )
   }
 
-  if (error) {
-    return <ErrorState onRetry={refetch} retryText='Retry Search' />
-  }
+  // if (error) {
+  //   return <ErrorState onRetry={refetch} retryText='Retry Search' />
+  // }
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>

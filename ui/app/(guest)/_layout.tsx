@@ -100,7 +100,7 @@ export default function GuestLayout() {
           />
         {/* </Stack.Protected> */}
         <Stack.Screen
-          name="(auth)/auth_form"
+          name="(auth)/sign_up"
           options={{
             presentation: 'modal',
             animation: 'fade',
