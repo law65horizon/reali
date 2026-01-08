@@ -49,15 +49,15 @@ export class ExperienceModel {
   private redisClient: redis.RedisClientType;
 
   constructor(private pool: Pool) {
-    this.redisClient = redis.createClient({
-      username: 'default',
-      password: process.env.REDIS_PASSWORD || 'npA2GgAvR6DpV0Z2NZurNQqK93mJIgmW',
-      socket: {
-        host: process.env.REDIS_HOST || 'redis-11196.c92.us-east-1-3.ec2.redns.redis-cloud.com',
-        port: parseInt(process.env.REDIS_PORT || '11196')
-      }
-    });
-    this.redisClient.connect().catch(err => console.error('Redis connection error:', err));
+    // this.redisClient = redis.createClient({
+    //   username: 'default',
+    //   password: process.env.REDIS_PASSWORD || 'npA2GgAvR6DpV0Z2NZurNQqK93mJIgmW',
+    //   socket: {
+    //     host: process.env.REDIS_HOST || 'redis-11196.c92.us-east-1-3.ec2.redns.redis-cloud.com',
+    //     port: parseInt(process.env.REDIS_PORT || '11196')
+    //   }
+    // });
+    // this.redisClient.connect().catch(err => console.error('Redis connection error:', err));
   }
 
   private mapGraphQLFieldsToColumns(requestedFields: string[]): string[] {

@@ -62,8 +62,8 @@ export class UserModel {
 
       // Create the address
       const addressQuery = `
-        INSERT INTO addresses (street, city_id, postal_code, latitude, longitude)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO addresses (street, city_id, postal_code, geom)
+        VALUES ($1, $2, $3, ST_SetSrid(ST_MakePoint($4, $5), 4326)::geography)
         ON CONFLICT (street, city_id, postal_code) DO NOTHING
         RETURNING id
       `;
@@ -79,12 +79,12 @@ export class UserModel {
 
     // Create the user
     const userQuery = `
-      INSERT INTO users (name, address_id, email, uid, password, phone, description)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO users (name, address_id, email, uid, password, phone, description, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
       RETURNING id, name, email, uid, phone, description, created_at, address_id
     `;
     const userResult = await client.query(userQuery, [
-      user.name|| 'siosi', address_id, user.email, user.uid||'sioso', user.password, user.phone, user.description
+      user.name, address_id, user.email, user.uid||'sioso', user.password, user.phone, user.description
     ]);
 
     await client.query('COMMIT');

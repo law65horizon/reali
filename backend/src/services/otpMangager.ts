@@ -1,22 +1,17 @@
-import { Address } from "cluster";
-import UserModel, { User } from "../../models/User.js";
-import {getEmailTransporter} from "../../utils/emailTransport.js";
-import { createUser } from "./user.js";
-import Jwt from "jsonwebtoken";
+// auth.resolvers.ts - Optimized with Redis OTP and Hybrid Sessions
+import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import nodemailer from 'nodemailer';
-import crypto from "crypto"
-import { Pool } from "pg";
-import pool from "../../config/database.js";
-import bcrypt from "bcryptjs";
-import SessionManager from "../../middleware/session.js";
-import { register } from "module";
-import redisClient from "../../config/redis.js";
-import message from "./message.js";
+import pool from '../../config/database.js';
+import redisClient from '../../config/redis.js';
+import SessionManager from '../../config/sessionManager.js';
+import UserModel, { User } from '../../models/User.js';
+import { getEmailTransporter } from '../../utils/emailTransport.js';
+import { Address } from '../../models/Address.js';
 
-// const jwt = require('jsonwebtoken');
-// const crypto = require('crypto');
-const CODE_SALT = process.env.CODE_SALT || crypto.randomBytes(16).toString('hex'); // Env for prod
-const CODE_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
+// ============================================
+// CONFIGURATION
+// ============================================
 
 const OTP_CONFIG = {
   LENGTH: 6,
@@ -35,14 +30,14 @@ class OTPManager {
   static async generateOTP(email: string): Promise<string> {
     // Check rate limit
     const rateLimitKey = `otp:ratelimit:${email}`;
-    const requestCount = parseInt((await redisClient.incr(rateLimitKey))?.toString());
+    const requestCount = await redisClient.incr(rateLimitKey);
     
     if (requestCount === 1) {
       await redisClient.expire(rateLimitKey, OTP_CONFIG.RATE_LIMIT_WINDOW);
     }
     
     if (requestCount > OTP_CONFIG.MAX_REQUESTS_PER_HOUR) {
-      const ttl = parseInt((await redisClient.ttl(rateLimitKey))?.toString());
+      const ttl = await redisClient.ttl(rateLimitKey);
       throw new Error(
         `Too many requests. Please try again in ${Math.ceil(ttl / 60)} minutes.`
       );
@@ -76,7 +71,7 @@ class OTPManager {
     }
 
     // Check attempts
-    const attempts = parseInt((await redisClient.get(attemptsKey))?.toString() || '0');
+    const attempts = parseInt((await redisClient.get(attemptsKey)) || '0');
     if (attempts >= OTP_CONFIG.MAX_ATTEMPTS) {
       // Delete OTP after max attempts
       await Promise.all([
@@ -114,29 +109,33 @@ class OTPManager {
   // Get remaining TTL
   static async getRemainingTime(email: string): Promise<number> {
     const otpKey = `otp:code:${email}`;
-    return parseInt((await redisClient.ttl(otpKey)).toString());
+    return await redisClient.ttl(otpKey);
   }
 }
 
+// ============================================
+// RESOLVERS
+// ============================================
+
 export default {
   Query: {
-    me: async (_, __, { user, }) => {
+    me: async (_: any, __: any, { user }: any) => {
       if (!user) throw new Error('Not authenticated');
-      
+
       const result = await pool.query(
-        'SELECT * FROM users WHERE id = $1',
-        [user.userId]
+        'SELECT id, email, name, phone, created_at FROM users WHERE id = $1',
+        [user.id]
       );
-      
-      if (result.rows.length === 0) throw new Error('User not found');
-      
+
+      if (result.rows.length === 0) {
+        throw new Error('User not found');
+      }
+
       return {
         id: result.rows[0].id,
         email: result.rows[0].email,
-        fullName: result.rows[0].full_name,
+        name: result.rows[0].name,
         phone: result.rows[0].phone,
-        // role: result.rows[0].role,
-        // emailVerified: result.rows[0].email_verified,
         createdAt: result.rows[0].created_at,
       };
     },
@@ -157,133 +156,177 @@ export default {
   },
 
   Mutation: {
-    login: async (_:any, {email, password, deviceInfo}:any, {db}) => {
-      console.log(email, password, deviceInfo)
+    // ============================================
+    // TRADITIONAL LOGIN (Email + Password)
+    // ============================================
+    login: async (
+      _: any,
+      { email, password, deviceInfo }: any,
+      { req }: any
+    ) => {
       try {
-        let result = await pool.query(
+        // Find user
+        const result = await pool.query(
           'SELECT id, email, name, password FROM users WHERE email = $1',
           [email]
         );
-        if (!result.rows[0]) {
-          throw new Error('Invalid credentials')
+
+        if (result.rows.length === 0) {
+          throw new Error('Invalid credentials');
         }
 
         const user = result.rows[0];
-        console.log({user})
 
+        // Verify password
         const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) {
-          throw new Error('Invalid credentials')
+          throw new Error('Invalid credentials');
         }
 
-        // const {accessToken, refreshToken, sessionId} = await SessionManager.createSession(
-        //   user.id,
-        //   {
-        //     email: user.email,
-        //     role: 'user',
-        //     deviceId: deviceInfo?.deviceId
-        //   }
-        // );
+        // Create session
+        const { accessToken, refreshToken, sessionId } =
+          await SessionManager.createSession(user.id, {
+            email: user.email,
+            role: 'user',
+            deviceId: deviceInfo?.deviceId || req.headers['user-agent'],
+          });
 
         return {
-          success: true,
-          message: 'Logged In successfully',
+          accessToken,
+          refreshToken,
           user: {
             id: user.id,
             email: user.email,
-            name: user.name
-          }
-        }
+            name: user.name,
+          },
+        };
       } catch (error) {
-        console.error('Login error:', error)
-        throw error
+        console.error('Login error:', error);
+        throw error;
       }
     },
 
-    register: async (_: any, { input }: { input: User & { address: Address } }, __: any, info: any) => {
+    // ============================================
+    // REGISTER (Email + Password)
+    // ============================================
+    register: async (
+      _: any,
+      { input }: { input: User & { address: Address } }
+    ) => {
       try {
+        // Check if user exists
         const existingUser = await pool.query(
           'SELECT id FROM users WHERE email = $1',
           [input.email]
         );
 
         if (existingUser.rows.length > 0) {
-          throw new Error('Email already registered')
+          throw new Error('Email already registered');
         }
 
+        // Hash password
         const hashedPassword = await bcrypt.hash(input.password, 10);
 
-        const user = await UserModel.create({...input, password: hashedPassword})
+        // Create user
+        const user = await UserModel.create({
+          ...input,
+          password: hashedPassword,
+        });
 
-        // const {accessToken, refreshToken} = await SessionManager.createSession(
-        //   user.id,
-        //   {email: user.email},
-        // );
+        // Create session
+        const { accessToken, refreshToken } =
+          await SessionManager.createSession(user.id, {
+            email: user.email,
+          });
 
         return {
-          success: true,
-          message: 'User created successfully',
-          user
-        }
+          accessToken,
+          refreshToken,
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+          },
+        };
       } catch (error) {
-        console.log('Register error:', error)
+        console.error('Register error:', error);
         throw error;
       }
-      // const user = UserModel.create()
     },
 
-    sendVerificationCode: async (_, { email },) => {
-      // Validate email format
+    // ============================================
+    // SEND OTP (Passwordless Login/Register)
+    // ============================================
+    sendVerificationCode: async (
+      _: any,
+      { email }: { email: string },
+      { req }: any
+    ) => {
       try {
+        // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
           throw new Error('Invalid email format');
         }
 
-        const otp = await OTPManager.generateOTP(email) 
+        // Generate OTP (stored in Redis)
+        const otp = await OTPManager.generateOTP(email);
 
-        console.log({otp})
-
+        // Send email
         const info = await getEmailTransporter().sendMail({
           from: '"Real Estate App" <noreply@realestate.com>',
           to: email,
           subject: 'Your Verification Code',
           html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #333;">Welcome to Real Estate App</h2>
-              <p style="font-size: 16px; color: #666;">Your verification code is:</p>
-              <div style="background-color: #f4f4f4; padding: 20px; text-align: center; border-radius: 8px;">
-                <h1 style="font-size: 48px; letter-spacing: 8px; margin: 0; color: #2563eb;">${otp}</h1>
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h2 style="color: #333; margin-bottom: 20px;">Welcome to Real Estate App</h2>
+              <p style="font-size: 16px; color: #666; margin-bottom: 30px;">
+                Your verification code is:
+              </p>
+              <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 12px; margin-bottom: 30px;">
+                <h1 style="font-size: 48px; letter-spacing: 12px; margin: 0; color: #ffffff; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                  ${otp}
+                </h1>
               </div>
-              <p style="font-size: 14px; color: #999; margin-top: 20px;">
-                This code expires in 10 minutes. If you didn't request this code, please ignore this email.
+              <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <p style="font-size: 14px; color: #666; margin: 0;">
+                  ⏰ This code expires in <strong>10 minutes</strong>
+                </p>
+                <p style="font-size: 14px; color: #666; margin: 10px 0 0 0;">
+                  🔒 You have <strong>5 attempts</strong> to enter the correct code
+                </p>
+              </div>
+              <p style="font-size: 13px; color: #999; margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+                If you didn't request this code, please ignore this email. Someone may have entered your email address by mistake.
               </p>
             </div>
           `,
         });
 
-        console.log("msos")
-
-        // Log preview URL for development (Ethereal only)
+        // Log preview URL for development
         const previewUrl = nodemailer.getTestMessageUrl(info);
         if (previewUrl) {
           console.log('📧 Preview Email:', previewUrl);
         }
 
+        // Get remaining time for response
         const expiresIn = await OTPManager.getRemainingTime(email);
 
-
-        console.log("isoiso")
         return {
           success: true,
           message: 'Verification code sent to your email',
+          expiresIn: expiresIn > 0 ? expiresIn : 600,
           previewUrl: previewUrl || null,
         };
       } catch (error) {
-        throw error
+        console.error('Send OTP error:', error);
+        throw error;
       }
     },
 
+    // ============================================
+    // VERIFY OTP (Passwordless Login/Register)
+    // ============================================
     verifyCode: async (
       _: any,
       {
@@ -296,21 +339,21 @@ export default {
       try {
         // Verify OTP (stored in Redis)
         await OTPManager.verifyOTP(input.email, input.code);
-    
+
         // Check if user exists
         let userResult = await pool.query(
           'SELECT id, email, name, phone, created_at FROM users WHERE email = $1',
           [input.email]
         );
-    
+
         let user;
-    
+
         if (userResult.rows.length === 0) {
           // New user - create account
           if (!input.name) {
             throw new Error('Name is required for new users');
           }
-    
+
           // Create user without password (passwordless auth)
           user = await UserModel.create({
             email: input.email,
@@ -323,7 +366,7 @@ export default {
           // Existing user - just login
           user = userResult.rows[0];
         }
-    
+
         // Create session (hybrid JWT + Redis)
         const { accessToken, refreshToken, sessionId } =
           await SessionManager.createSession(user.id, {
@@ -331,7 +374,7 @@ export default {
             role: 'user',
             deviceId: req.headers['user-agent'],
           });
-    
+
         return {
           accessToken,
           refreshToken,
@@ -350,24 +393,33 @@ export default {
       }
     },
 
-    refreshAccessToken: async (_, { refreshToken }) => {
+    // ============================================
+    // REFRESH ACCESS TOKEN
+    // ============================================
+    refreshAccessToken: async (
+      _: any,
+      { refreshToken }: { refreshToken: string }
+    ) => {
       try {
         const tokens = await SessionManager.refreshAccessToken(refreshToken);
 
-        if(!tokens) {
-          throw new Error('Invalid or expired refresh')
+        if (!tokens) {
+          throw new Error('Invalid or expired refresh token');
         }
 
         return {
           accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken
-        }
+          refreshToken: tokens.refreshToken,
+        };
       } catch (error) {
-        
+        console.error('Refresh token error:', error);
+        throw error;
       }
-      
     },
 
+    // ============================================
+    // LOGOUT (Single Device)
+    // ============================================
     logout: async (_: any, __: any, { user, sessionId, req }: any) => {
       if (!user || !sessionId) {
         throw new Error('Not authenticated');
@@ -387,6 +439,9 @@ export default {
       }
     },
 
+    // ============================================
+    // LOGOUT ALL DEVICES
+    // ============================================
     logoutAllDevices: async (_: any, __: any, { user }: any) => {
       if (!user) {
         throw new Error('Not authenticated');
@@ -405,32 +460,42 @@ export default {
       }
     },
 
-    updateProfile: async (_, { fullName, phone }, { db, user }) => {
-      if (!user) throw new Error('Not authenticated');
+    // ============================================
+    // UPDATE PROFILE
+    // ============================================
+    updateProfile: async (
+      _: any,
+      { name, phone }: { name?: string; phone?: string },
+      { user }: any
+    ) => {
+      if (!user) {
+        throw new Error('Not authenticated');
+      }
 
-      const result = await db.query(
-        `UPDATE users 
-         SET full_name = COALESCE($1, full_name), 
-             phone = COALESCE($2, phone),
-             updated_at = NOW()
-         WHERE id = $3 
-         RETURNING *`,
-        [fullName, phone, user.userId]
-      );
+      try {
+        const result = await pool.query(
+          `UPDATE users 
+           SET name = COALESCE($1, name), 
+               phone = COALESCE($2, phone)
+           WHERE id = $3 
+           RETURNING id, email, name, phone, created_at`,
+          [name, phone, user.id]
+        );
 
-      const updated = result.rows[0];
+        if (result.rows.length === 0) {
+          throw new Error('User not found');
+        }
 
-      return {
-        id: updated.id,
-        email: updated.email,
-        fullName: updated.full_name,
-        phone: updated.phone,
-        role: updated.role,
-        emailVerified: updated.email_verified,
-        createdAt: updated.created_at,
-      };
+        return result.rows[0];
+      } catch (error) {
+        console.error('Update profile error:', error);
+        throw error;
+      }
     },
 
+    // ============================================
+    // CHANGE PASSWORD
+    // ============================================
     changePassword: async (
       _: any,
       { currentPassword, newPassword }: any,
@@ -439,20 +504,20 @@ export default {
       if (!user) {
         throw new Error('Not authenticated');
       }
-    
+
       try {
         // Get user with password
         const result = await pool.query(
           'SELECT password FROM users WHERE id = $1',
           [user.id]
         );
-    
+
         if (result.rows.length === 0) {
           throw new Error('User not found');
         }
-    
+
         const dbUser = result.rows[0];
-    
+
         // Check if user has a password (passwordless users need to set one first)
         if (!dbUser.password) {
           // First-time password setup
@@ -461,32 +526,32 @@ export default {
             hashedPassword,
             user.id,
           ]);
-    
+
           return {
             success: true,
             message: 'Password set successfully',
           };
         }
-    
+
         // Verify current password
         const validPassword = await bcrypt.compare(
           currentPassword,
           dbUser.password
         );
-    
+
         if (!validPassword) {
           throw new Error('Current password is incorrect');
         }
-    
+
         // Hash new password
         const hashedPassword = await bcrypt.hash(newPassword, 10);
-    
+
         // Update password
         await pool.query('UPDATE users SET password = $1 WHERE id = $2', [
           hashedPassword,
           user.id,
         ]);
-    
+
         // Logout from all other devices
         const allSessions = await SessionManager.getUserActiveSessions(user.id);
         for (const session of allSessions) {
@@ -494,7 +559,7 @@ export default {
             await SessionManager.deleteSession((session as any).sessionId);
           }
         }
-    
+
         return {
           success: true,
           message: 'Password changed successfully',
@@ -505,4 +570,4 @@ export default {
       }
     },
   },
-}
+};

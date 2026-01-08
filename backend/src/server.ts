@@ -18,6 +18,8 @@ import jwt from 'jsonwebtoken';
 // import { authMiddleWare } from './middleware/auth.js';
 import { verifyToken } from './services/auth.js';
 import { createWebhookRouter } from './routes/createWebHook.js';
+import { connectRedis } from './config/redis.js';
+import { authenticateJWT } from './middleware/auth.js';
 
 
 
@@ -50,6 +52,7 @@ const startServer = async () => {
   try {
     await createEmailTransporter()
     await connectDB();
+    await connectRedis()
     await server.start();
     console.log('Apollo Server started successfully');
 
@@ -65,18 +68,29 @@ const startServer = async () => {
       '/',
       express.json(),
       expressMiddleware(server, {
-        context: async ({ req, }) => {
+        // context: async ({ req, }) => {
+        //   await new Promise<void>((resolve, reject) => {
+        //     verifyToken({ req, next: (err?: any) => (err ? reject(err) : resolve()) });
+        //   });
+
+        //   return {
+        //     req,
+        //     db: pool,
+        //     pubsub,
+        //     user: (req as any).user
+        //   }
+        // },
+        context: async ({req, res}) => {
           await new Promise<void>((resolve, reject) => {
-            verifyToken({ req, next: (err?: any) => (err ? reject(err) : resolve()) });
-          });
+            authenticateJWT(req, res, (err?: any) => (err ? reject(err) : resolve()) )
+          })
 
           return {
             req,
-            db: pool,
-            pubsub,
+            pubsub, 
             user: (req as any).user
           }
-        },
+        }
       })
     );
 

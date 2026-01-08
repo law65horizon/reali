@@ -1,37 +1,30 @@
-import { Request, Response, NextFunction } from 'express'
-import { verifyToken } from '../services/auth.js'
+import { NextFunction, Request, Response } from "express";
+import SessionManager from "./session.js";
 
-// export const authMiddleWare = async (req:Request, res: Response, next: NextFunction) => {
-//     try {
-//         const token = req.headers.authorization?.replace('Bearer ', '')
-//         if (token) {
-//             const user = await verifyToken(token);
-//             (req as any).user = user
-//         }
-//         next();
-//     } catch (error) {
-//         res.status(401).json({error: 'Unauthorized'})
-//     }
-// }
+export const authenticateJWT = async (req: Request, res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // return res.status(401).json({error: 'No token provided'})
+    (req as any).user = null;
+    return next()
+  }
 
-// import { verify } from "jsonwebtoken";
-// import { Request, Response, NextFunction } from "express";
-// import { User } from "../models/User.js";
+  const token = authHeader.replace('Bearer ', '')
+  const sessionData = await SessionManager.verifyAccessToken(token)
 
-// export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
-//   const token = req.headers.authorization?.split(" ")[1];
-//   console.log('Auth middleware: token:', token);
-//   if (!token) {
-//     console.log('No token provided');
-//     return next();
-//   }
-//   try {
-//     const decoded = verify(token, process.env.JWT_SECRET || "your-secret-key");
-//     console.log('Auth middleware: decoded token:', decoded);
-//     req.user = decoded as User; // Ensure User interface matches decoded payload
-//     next();
-//   } catch (error) {
-//     console.error('Auth middleware: JWT verification error:', error);
-//     next();
-//   }
-// };
+  console.log(sessionData)
+  if (!sessionData) {
+    // return res.status(402).json({error: "Invalid or expired token"})
+    (req as any).user = null;
+    return next()
+  }
+
+  (req as any).user = {
+    id: sessionData.userId,
+    email: sessionData.email,
+    role: sessionData.role
+  }
+
+  next()
+
+}

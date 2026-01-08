@@ -1,424 +1,434 @@
-// server.js
-const express = require('express');
-const { ApolloServer } = require('@apollo/server');
-const { expressMiddleware } = require('@apollo/server/express4');
-const { Pool } = require('pg');
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
-const nodemailer = require('nodemailer');
-const cors = require('cors');
-require('dotenv').config();
+// geoSearch.js - Advanced geospatial search with Redis + PostgreSQL
+import pool from './db.js'; // Your PostgreSQL connection
+import redis from './src/config/redis.js';
 
-const app = express();
+const GEO_KEY = 'properties:geo';
+const PROPERTY_HASH_PREFIX = 'property:hash:';
 
-// PostgreSQL connection pool
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
-
-// Email transporter using Ethereal (free test email service)
-// For production, replace with SendGrid, AWS SES, or Postmark
-let emailTransporter;
-
-async function createEmailTransporter() {
-  // Create test account for development
-  const testAccount = await nodemailer.createTestAccount();
-  
-  emailTransporter = nodemailer.createTransport({
-    host: 'smtp.ethereal.email',
-    port: 587,
-    secure: false,
-    auth: {
-      user: testAccount.user,
-      pass: testAccount.pass,
-    },
-  });
-  
-  console.log('📧 Email transporter created. Preview URLs will be logged.');
-}
-
-// GraphQL Type Definitions
-const typeDefs = `#graphql
-  type User {
-    id: ID!
-    email: String!
-    fullName: String
-    phone: String
-    role: String!
-    emailVerified: Boolean!
-    createdAt: String!
+export class GeoSearch {
+  // Add property to geospatial index with metadata
+  static async indexProperty(property) {
+    const { id, latitude, longitude, price, bedrooms, bathrooms, type, status } = property;
+    
+    // Add to geo index
+    await redis.geoadd(GEO_KEY, longitude, latitude, id);
+    
+    // Store filterable attributes in hash for quick access
+    await redis.hset(`${PROPERTY_HASH_PREFIX}${id}`, {
+      price,
+      bedrooms,
+      bathrooms,
+      type,
+      status,
+      latitude,
+      longitude,
+    });
+    
+    // Set expiry to keep data fresh (optional)
+    await redis.expire(`${PROPERTY_HASH_PREFIX}${id}`, 86400); // 24 hours
   }
 
-  type AuthPayload {
-    accessToken: String!
-    refreshToken: String!
-    user: User!
+  // Main search: nearby + filters
+  static async searchNearby(latitude, longitude, radiusKm, filters = {}) {
+    const {
+      minPrice,
+      maxPrice,
+      minBedrooms,
+      maxBedrooms,
+      minBathrooms,
+      propertyType,
+      status = 'active',
+      limit = 50,
+      offset = 0,
+    } = filters;
+
+    // Step 1: Get all properties within radius from Redis
+    const nearbyIds = await redis.georadius(
+      GEO_KEY,
+      longitude,
+      latitude,
+      radiusKm,
+      'km',
+      'ASC',
+      'COUNT',
+      500 // Get more than needed for filtering
+    );
+
+    if (nearbyIds.length === 0) {
+      return { properties: [], total: 0 };
+    }
+
+    // Step 2: Quick filter using Redis hashes
+    const filtered = await this.filterByAttributes(nearbyIds, {
+      minPrice,
+      maxPrice,
+      minBedrooms,
+      maxBedrooms,
+      minBathrooms,
+      propertyType,
+      status,
+    });
+
+    // Step 3: Fetch full details from PostgreSQL for remaining properties
+    const propertyIds = filtered.slice(offset, offset + limit);
+    
+    if (propertyIds.length === 0) {
+      return { properties: [], total: filtered.length };
+    }
+
+    const properties = await this.fetchPropertiesFromDB(propertyIds, latitude, longitude);
+
+    return {
+      properties,
+      total: filtered.length,
+      page: Math.floor(offset / limit) + 1,
+      totalPages: Math.ceil(filtered.length / limit),
+    };
   }
 
-  type Query {
-    me: User
-  }
-
-  type Mutation {
-    sendVerificationCode(email: String!): SendCodeResponse!
-    verifyCode(email: String!, code: String!): AuthPayload!
-    refreshAccessToken(refreshToken: String!): AuthPayload!
-    logout(refreshToken: String!): Boolean!
-    updateProfile(fullName: String, phone: String): User!
-  }
-
-  type SendCodeResponse {
-    success: Boolean!
-    message: String!
-    previewUrl: String
-  }
-`;
-
-// GraphQL Resolvers
-const resolvers = {
-  Query: {
-    me: async (_, __, { user, db }) => {
-      if (!user) throw new Error('Not authenticated');
+  // Filter properties by attributes using Redis hashes
+  static async filterByAttributes(propertyIds, filters) {
+    const pipeline = redis.pipe
+    
+    // Fetch all property hashes in one go
+    propertyIds.forEach(id => {
+      pipeline.hgetall(`${PROPERTY_HASH_PREFIX}${id}`);
+    });
+    
+    const results = await pipeline.exec();
+    
+    // Filter in memory
+    const filtered = [];
+    
+    for (let i = 0; i < results.length; i++) {
+      const [err, attrs] = results[i];
+      if (err || !attrs || Object.keys(attrs).length === 0) continue;
       
-      const result = await db.query(
-        'SELECT * FROM users WHERE id = $1',
-        [user.userId]
-      );
+      const propertyId = propertyIds[i];
       
-      if (result.rows.length === 0) throw new Error('User not found');
+      // Apply filters
+      if (filters.minPrice && parseFloat(attrs.price) < filters.minPrice) continue;
+      if (filters.maxPrice && parseFloat(attrs.price) > filters.maxPrice) continue;
+      if (filters.minBedrooms && parseInt(attrs.bedrooms) < filters.minBedrooms) continue;
+      if (filters.maxBedrooms && parseInt(attrs.bedrooms) > filters.maxBedrooms) continue;
+      if (filters.minBathrooms && parseInt(attrs.bathrooms) < filters.minBathrooms) continue;
+      if (filters.propertyType && attrs.type !== filters.propertyType) continue;
+      if (filters.status && attrs.status !== filters.status) continue;
       
+      filtered.push(propertyId);
+    }
+    
+    return filtered;
+  }
+
+  // Hybrid approach: Use Redis for geo + basic filters, PostgreSQL for complex queries
+  static async searchNearbyHybrid(latitude, longitude, radiusKm, filters = {}) {
+    const {
+      minPrice,
+      maxPrice,
+      minBedrooms,
+      maxBedrooms,
+      minBathrooms,
+      propertyType,
+      status = 'active',
+      amenities = [],
+      limit = 50,
+      offset = 0,
+    } = filters;
+
+    // Get nearby property IDs from Redis
+    const nearbyResults = await redis.georadius(
+      GEO_KEY,
+      longitude,
+      latitude,
+      radiusKm,
+      'km',
+      'WITHDIST',
+      'ASC'
+    );
+
+    if (nearbyResults.length === 0) {
+      return { properties: [], total: 0 };
+    }
+
+    // Extract IDs and distances
+    const idsWithDistance = nearbyResults.map(([id, distance]) => ({
+      id,
+      distance: parseFloat(distance),
+    }));
+
+    const propertyIds = idsWithDistance.map(item => item.id);
+
+    // Build PostgreSQL query with all filters
+    let query = `
+      SELECT p.*, 
+        (SELECT json_agg(url) FROM property_images WHERE property_id = p.id) as images,
+        (SELECT json_agg(name) FROM property_amenities pa 
+         JOIN amenities a ON pa.amenity_id = a.id 
+         WHERE pa.property_id = p.id) as amenities
+      FROM properties p
+      WHERE p.id = ANY($1)
+        AND p.status = $2
+    `;
+    
+    const params = [propertyIds, status];
+    let paramIndex = 3;
+
+    if (minPrice) {
+      query += ` AND p.price >= $${paramIndex++}`;
+      params.push(minPrice);
+    }
+    if (maxPrice) {
+      query += ` AND p.price <= $${paramIndex++}`;
+      params.push(maxPrice);
+    }
+    if (minBedrooms) {
+      query += ` AND p.bedrooms >= $${paramIndex++}`;
+      params.push(minBedrooms);
+    }
+    if (maxBedrooms) {
+      query += ` AND p.bedrooms <= $${paramIndex++}`;
+      params.push(maxBedrooms);
+    }
+    if (minBathrooms) {
+      query += ` AND p.bathrooms >= $${paramIndex++}`;
+      params.push(minBathrooms);
+    }
+    if (propertyType) {
+      query += ` AND p.type = $${paramIndex++}`;
+      params.push(propertyType);
+    }
+
+    // Complex filter: properties with specific amenities
+    if (amenities.length > 0) {
+      query += `
+        AND p.id IN (
+          SELECT property_id 
+          FROM property_amenities pa
+          JOIN amenities a ON pa.amenity_id = a.id
+          WHERE a.name = ANY($${paramIndex++})
+          GROUP BY property_id
+          HAVING COUNT(DISTINCT a.name) = $${paramIndex++}
+        )
+      `;
+      params.push(amenities, amenities.length);
+    }
+
+    query += ` ORDER BY p.created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
+    params.push(limit, offset);
+
+    const { rows } = await pool.query(query, params);
+
+    // Merge with distance data from Redis
+    const properties = rows.map(property => {
+      const distanceData = idsWithDistance.find(item => item.id === property.id.toString());
       return {
-        id: result.rows[0].id,
-        email: result.rows[0].email,
-        fullName: result.rows[0].full_name,
-        phone: result.rows[0].phone,
-        role: result.rows[0].role,
-        emailVerified: result.rows[0].email_verified,
-        createdAt: result.rows[0].created_at,
+        ...property,
+        distance: distanceData?.distance || null,
       };
-    },
-  },
+    });
 
-  Mutation: {
-    sendVerificationCode: async (_, { email }, { db, rateLimiter }) => {
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        throw new Error('Invalid email format');
-      }
+    // Get total count for pagination
+    let countQuery = `
+      SELECT COUNT(*) 
+      FROM properties p
+      WHERE p.id = ANY($1) AND p.status = $2
+    `;
+    const countParams = [propertyIds, status];
+    let countParamIndex = 3;
 
-      // Rate limiting: Check if user has requested too many codes recently
-      const recentCodes = await db.query(
-        `SELECT COUNT(*) as count FROM verification_codes 
-         WHERE email = $1 AND created_at > NOW() - INTERVAL '1 hour'`,
-        [email]
-      );
+    if (minPrice) {
+      countQuery += ` AND p.price >= $${countParamIndex++}`;
+      countParams.push(minPrice);
+    }
+    if (maxPrice) {
+      countQuery += ` AND p.price <= $${countParamIndex++}`;
+      countParams.push(maxPrice);
+    }
+    if (minBedrooms) {
+      countQuery += ` AND p.bedrooms >= $${countParamIndex++}`;
+      countParams.push(minBedrooms);
+    }
+    if (maxBedrooms) {
+      countQuery += ` AND p.bedrooms <= $${countParamIndex++}`;
+      countParams.push(maxBedrooms);
+    }
+    if (minBathrooms) {
+      countQuery += ` AND p.bathrooms >= $${countParamIndex++}`;
+      countParams.push(minBathrooms);
+    }
+    if (propertyType) {
+      countQuery += ` AND p.type = $${countParamIndex++}`;
+      countParams.push(propertyType);
+    }
+    if (amenities.length > 0) {
+      countQuery += `
+        AND p.id IN (
+          SELECT property_id 
+          FROM property_amenities pa
+          JOIN amenities a ON pa.amenity_id = a.id
+          WHERE a.name = ANY($${countParamIndex++})
+          GROUP BY property_id
+          HAVING COUNT(DISTINCT a.name) = $${countParamIndex++}
+        )
+      `;
+      countParams.push(amenities, amenities.length);
+    }
 
-      if (parseInt(recentCodes.rows[0].count) >= 3) {
-        throw new Error('Too many requests. Please try again in an hour.');
-      }
+    const { rows: [{ count }] } = await pool.query(countQuery, countParams);
 
-      // Generate 6-digit code
-      const code = crypto.randomInt(100000, 999999).toString();
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    return {
+      properties,
+      total: parseInt(count),
+      page: Math.floor(offset / limit) + 1,
+      totalPages: Math.ceil(parseInt(count) / limit),
+    };
+  }
 
-      // Invalidate old unused codes for this email
-      await db.query(
-        'UPDATE verification_codes SET used = true WHERE email = $1 AND used = false',
-        [email]
-      );
+  // Search in bounding box with filters (for map view)
+  static async searchInBounds(minLat, minLon, maxLat, maxLon, filters = {}) {
+    // Calculate center and dimensions
+    const centerLon = (minLon + maxLon) / 2;
+    const centerLat = (minLat + maxLat) / 2;
+    const width = Math.abs(maxLon - minLon) * 111; // Approx km
+    const height = Math.abs(maxLat - minLat) * 111;
 
-      // Store new code
-      await db.query(
-        `INSERT INTO verification_codes (email, code, expires_at) 
-         VALUES ($1, $2, $3)`,
-        [email, code, expiresAt]
-      );
+    const nearbyIds = await redis.geosearch(
+      GEO_KEY,
+      'FROMLONLAT',
+      centerLon,
+      centerLat,
+      'BYBOX',
+      width,
+      height,
+      'km'
+    );
 
-      // Send email
-      const info = await emailTransporter.sendMail({
-        from: '"Real Estate App" <noreply@realestate.com>',
-        to: email,
-        subject: 'Your Verification Code',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #333;">Welcome to Real Estate App</h2>
-            <p style="font-size: 16px; color: #666;">Your verification code is:</p>
-            <div style="background-color: #f4f4f4; padding: 20px; text-align: center; border-radius: 8px;">
-              <h1 style="font-size: 48px; letter-spacing: 8px; margin: 0; color: #2563eb;">${code}</h1>
-            </div>
-            <p style="font-size: 14px; color: #999; margin-top: 20px;">
-              This code expires in 10 minutes. If you didn't request this code, please ignore this email.
-            </p>
-          </div>
-        `,
+    if (nearbyIds.length === 0) {
+      return [];
+    }
+
+    // Filter by attributes
+    const filtered = await this.filterByAttributes(nearbyIds, filters);
+
+    // Fetch from DB (limit for map view)
+    const properties = await this.fetchPropertiesFromDB(filtered.slice(0, 100));
+
+    return properties;
+  }
+
+  // Fetch properties from PostgreSQL with distance calculation
+  static async fetchPropertiesFromDB(propertyIds, refLat = null, refLon = null) {
+    if (propertyIds.length === 0) return [];
+
+    let query = `
+      SELECT p.*,
+        (SELECT json_agg(url) FROM property_images WHERE property_id = p.id) as images
+    `;
+
+    if (refLat && refLon) {
+      // Calculate distance using PostgreSQL (if you have PostGIS)
+      query += `,
+        earth_distance(
+          ll_to_earth(${refLat}, ${refLon}),
+          ll_to_earth(p.latitude, p.longitude)
+        ) / 1000 as distance_km
+      `;
+    }
+
+    query += ` FROM properties p WHERE p.id = ANY($1) ORDER BY p.created_at DESC`;
+
+    const { rows } = await pool.query(query, [propertyIds]);
+    return rows;
+  }
+
+  // Update property in geo index
+  static async updateProperty(propertyId, updates) {
+    const { latitude, longitude, price, bedrooms, bathrooms, type, status } = updates;
+
+    // Update geo location if changed
+    if (latitude && longitude) {
+      await redis.geoadd(GEO_KEY, longitude, latitude, propertyId);
+    }
+
+    // Update hash attributes
+    const hashUpdates = {};
+    if (price !== undefined) hashUpdates.price = price;
+    if (bedrooms !== undefined) hashUpdates.bedrooms = bedrooms;
+    if (bathrooms !== undefined) hashUpdates.bathrooms = bathrooms;
+    if (type !== undefined) hashUpdates.type = type;
+    if (status !== undefined) hashUpdates.status = status;
+    if (latitude !== undefined) hashUpdates.latitude = latitude;
+    if (longitude !== undefined) hashUpdates.longitude = longitude;
+
+    if (Object.keys(hashUpdates).length > 0) {
+      await redis.hset(`${PROPERTY_HASH_PREFIX}${propertyId}`, hashUpdates);
+    }
+  }
+
+  // Remove property
+  static async removeProperty(propertyId) {
+    await Promise.all([
+      redis.zrem(GEO_KEY, propertyId),
+      redis.del(`${PROPERTY_HASH_PREFIX}${propertyId}`),
+    ]);
+  }
+
+  // Batch index properties (useful for initial load or re-indexing)
+  static async batchIndex(properties) {
+    const pipeline = redis.pipeline();
+
+    properties.forEach(property => {
+      const { id, latitude, longitude, price, bedrooms, bathrooms, type, status } = property;
+      
+      pipeline.geoadd(GEO_KEY, longitude, latitude, id);
+      pipeline.hset(`${PROPERTY_HASH_PREFIX}${id}`, {
+        price,
+        bedrooms,
+        bathrooms,
+        type,
+        status,
+        latitude,
+        longitude,
       });
+    });
 
-      // Log preview URL for development (Ethereal only)
-      const previewUrl = nodemailer.getTestMessageUrl(info);
-      if (previewUrl) {
-        console.log('📧 Preview Email:', previewUrl);
-      }
+    await pipeline.exec();
+    console.log(`Indexed ${properties.length} properties`);
+  }
+}
 
-      return {
-        success: true,
-        message: 'Verification code sent to your email',
-        previewUrl: previewUrl || null,
-      };
+// GraphQL resolvers
+export const geoResolvers = {
+  Query: {
+    nearbyProperties: async (_, { lat, lng, radius, filters }) => {
+      const result = await GeoSearch.searchNearbyHybrid(lat, lng, radius, filters);
+      return result;
     },
 
-    verifyCode: async (_, { email, code }, { db, req }) => {
-      // Fetch verification code
-      const result = await db.query(
-        `SELECT * FROM verification_codes 
-         WHERE email = $1 AND code = $2 AND used = false 
-         AND expires_at > NOW()
-         ORDER BY created_at DESC LIMIT 1`,
-        [email, code]
-      );
+    propertiesInBounds: async (_, { minLat, minLon, maxLat, maxLon, filters }) => {
+      return await GeoSearch.searchInBounds(minLat, minLon, maxLat, maxLon, filters);
+    },
 
-      if (result.rows.length === 0) {
-        // Increment attempts for rate limiting
-        await db.query(
-          `UPDATE verification_codes 
-           SET attempts = attempts + 1 
-           WHERE email = $1 AND code = $2 AND used = false`,
-          [email, code]
+    searchProperties: async (_, { filters }) => {
+      // If location provided, use geo search
+      if (filters.lat && filters.lng && filters.radius) {
+        return await GeoSearch.searchNearbyHybrid(
+          filters.lat,
+          filters.lng,
+          filters.radius,
+          filters
         );
-        throw new Error('Invalid or expired code');
       }
-
-      const verificationCode = result.rows[0];
-
-      // Check attempt limit
-      if (verificationCode.attempts >= 5) {
-        throw new Error('Too many failed attempts. Please request a new code.');
-      }
-
-      // Mark code as used
-      await db.query(
-        'UPDATE verification_codes SET used = true WHERE id = $1',
-        [verificationCode.id]
-      );
-
-      // Find or create user
-      let userResult = await db.query(
-        'SELECT * FROM users WHERE email = $1',
-        [email]
-      );
-
-      let user;
-      if (userResult.rows.length === 0) {
-        // Create new user
-        userResult = await db.query(
-          `INSERT INTO users (email, email_verified) 
-           VALUES ($1, true) 
-           RETURNING *`,
-          [email]
-        );
-        user = userResult.rows[0];
-      } else {
-        // Update existing user
-        await db.query(
-          'UPDATE users SET email_verified = true, updated_at = NOW() WHERE email = $1',
-          [email]
-        );
-        user = userResult.rows[0];
-      }
-
-      // Generate tokens
-      const accessToken = jwt.sign(
-        { 
-          userId: user.id, 
-          email: user.email, 
-          role: user.role 
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: '15m' }
-      );
-
-      const refreshToken = crypto.randomBytes(64).toString('hex');
-
-      // Store refresh token
-      const deviceInfo = {
-        userAgent: req.headers['user-agent'],
-        ip: req.ip,
-      };
-
-      await db.query(
-        `INSERT INTO refresh_tokens (user_id, token, device_info, expires_at) 
-         VALUES ($1, $2, $3, $4)`,
-        [
-          user.id, 
-          refreshToken, 
-          JSON.stringify(deviceInfo),
-          new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
-        ]
-      );
-
-      return {
-        accessToken,
-        refreshToken,
-        user: {
-          id: user.id,
-          email: user.email,
-          fullName: user.full_name,
-          phone: user.phone,
-          role: user.role,
-          emailVerified: user.email_verified,
-          createdAt: user.created_at,
-        },
-      };
-    },
-
-    refreshAccessToken: async (_, { refreshToken }, { db }) => {
-      const result = await db.query(
-        `SELECT rt.*, u.* FROM refresh_tokens rt
-         JOIN users u ON rt.user_id = u.id
-         WHERE rt.token = $1 AND rt.expires_at > NOW()`,
-        [refreshToken]
-      );
-
-      if (result.rows.length === 0) {
-        throw new Error('Invalid or expired refresh token');
-      }
-
-      const row = result.rows[0];
-
-      const accessToken = jwt.sign(
-        { 
-          userId: row.user_id, 
-          email: row.email, 
-          role: row.role 
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: '15m' }
-      );
-
-      return {
-        accessToken,
-        refreshToken, // Return same refresh token
-        user: {
-          id: row.user_id,
-          email: row.email,
-          fullName: row.full_name,
-          phone: row.phone,
-          role: row.role,
-          emailVerified: row.email_verified,
-          createdAt: row.created_at,
-        },
-      };
-    },
-
-    logout: async (_, { refreshToken }, { db, user }) => {
-      if (!user) throw new Error('Not authenticated');
-
-      await db.query(
-        'DELETE FROM refresh_tokens WHERE token = $1 AND user_id = $2',
-        [refreshToken, user.userId]
-      );
-
-      return true;
-    },
-
-    updateProfile: async (_, { fullName, phone }, { db, user }) => {
-      if (!user) throw new Error('Not authenticated');
-
-      const result = await db.query(
-        `UPDATE users 
-         SET full_name = COALESCE($1, full_name), 
-             phone = COALESCE($2, phone),
-             updated_at = NOW()
-         WHERE id = $3 
-         RETURNING *`,
-        [fullName, phone, user.userId]
-      );
-
-      const updated = result.rows[0];
-
-      return {
-        id: updated.id,
-        email: updated.email,
-        fullName: updated.full_name,
-        phone: updated.phone,
-        role: updated.role,
-        emailVerified: updated.email_verified,
-        createdAt: updated.created_at,
-      };
+      
+      // Otherwise fall back to regular DB search
+      return await regularSearch(filters);
     },
   },
 };
 
-// JWT Verification Middleware
-const verifyToken = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader) {
-    req.user = null;
-    return next();
-  }
-
-  const token = authHeader.split(' ')[1];
-  
-  if (!token) {
-    req.user = null;
-    return next();
-  }
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (err) {
-    req.user = null;
-    next();
-  }
-};
-
-// Initialize Apollo Server
-async function startServer() {
-  await createEmailTransporter();
-
-  const server = new ApolloServer({
-    typeDefs,
-    resolvers,
-    formatError: (error) => {
-      console.error('GraphQL Error:', error);
-      return error;
-    },
-  });
-
-  await server.start();
-
-  app.use(cors());
-  app.use(express.json());
-  app.use(verifyToken);
-
-  app.use(
-    '/graphql',
-    expressMiddleware(server, {
-      context: async ({ req }) => ({
-        user: req.user,
-        db: pool,
-        req,
-      }),
-    })
-  );
-
-  const PORT = process.env.PORT || 4000;
-  app.listen(PORT, () => {
-    console.log(`🚀 Server ready at http://localhost:${PORT}/graphql`);
-  });
+// Fallback for non-geo searches
+async function regularSearch(filters) {
+  // Implement standard PostgreSQL search without geo
+  return { properties: [], total: 0 };
 }
-
-startServer().catch((err) => {
-  console.error('Failed to start server:', err);
-  process.exit(1);
-});

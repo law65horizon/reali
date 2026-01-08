@@ -104,9 +104,10 @@ export default {
 
         createCheckoutSession: async (
             _: any,
-            { bookingId, successUrl, cancelUrl }: { bookingId: number; successUrl: string; cancelUrl: string },
+            { input }: { input: {bookingId: string, successUrl: string, cancelUrl: string} },
             {user}
         ) => {
+          const {bookingId, successUrl, cancelUrl} = input
         
             if (!user) {
               throw new Error('Authentication required');
@@ -118,7 +119,7 @@ export default {
         
             try {
               const session = await StripeService.createCheckoutSession(
-                bookingId,
+                parseInt(bookingId),
                 user,
                 successUrl,
                 cancelUrl,

@@ -49,6 +49,7 @@ export default {
   DateTime: dateTimeScalar,
   Query: {
     getProperty: async (_: any, { id }: { id: string }, { user }: { user: User }, info: any) => {
+      console.log('wowiowiwo')
       const requestedFields = getRequestedFields(info);
       const property = await PropertyModel.findById(parseInt(id), requestedFields);
       if (!property) return null;
@@ -60,7 +61,7 @@ export default {
       return await PropertyModel.findByRealtor(parseInt(realtor_id), requestedFields);
     },
     searchRoomTypes: async (_: any, {input}: {input: SearchRoomsInput}, __: any, info: any) => {
-      // console.log({user})
+      console.log({sos: 'wiwoiw'})
       const requestedFields = getNestedRequestedFields(info)
       // console.log({requestedFields})
       return await PropertyModel.searchRoomTypes(input, requestedFields)
@@ -161,11 +162,11 @@ export default {
     //   console.log({requestedFields})
     //   return await PropertyModel.findById(parent.property_id, requestedFields)
     // },
-    availableUnits: async (parent) => {
-      // console.log({parent: parent.id})
-      // return 10
-      return await PropertyModel.countUnits({id: parent.id})
-    },
+    // availableUnits: async (parent) => {
+    //   // console.log({parent: parent.id})
+    //   // return 10
+    //   return await PropertyModel.countUnits({id: parent.id})
+    // },
   },
 };
 

@@ -28,7 +28,7 @@ export const verifyToken = ({req, next}: {req: Request, next?: NextFunction}) =>
     (req as any).user = null;
     return next();
   }
-  console.log({authHeader})
+  // console.log({authHeader})
   const token = authHeader.split(' ')[1];
   
   if (!token) {
@@ -38,12 +38,12 @@ export const verifyToken = ({req, next}: {req: Request, next?: NextFunction}) =>
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log({decoded});
+    // console.log({decoded});
     (req as any).user = decoded;
     next();
   } catch (err) {
     (req as any).user = null;
-    console.log({err})
+    // console.log({err})
     next();
   }
 };

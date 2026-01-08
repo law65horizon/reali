@@ -30,18 +30,18 @@ export class StripeService {
    * Create a Stripe Checkout Session for booking payment
    */
   async createCheckoutSession(
-    bookingI: number,
+    bookingId: number,
     user: any,
-    successUr: string,
-    cancelUr: string
+    successUrl: string,
+    cancelUrl: string
   ): Promise<{ clientSecret: string }> {
     const client = await this.pool.connect();
-    let successUrl = 'exp://localhost:8081/--/payment-success?bookingId=${bookingId}`'
-    let cancelUrl = 'exp://localhost:8081/--/payment-cancel?bookingId=${bookingId}`'
-    let bookingId = 37;
+    // let successUrl = 'exp://localhost:8081/--/payment-success?bookingId=${bookingId}`'
+    // let cancelUrl = 'exp://localhost:8081/--/payment-cancel?bookingId=${bookingId}`'
+    // let bookingId = 37;
     // console.log({successUrl, cancelUrl})
     try {
-        console.log({successUr})
+        console.log({successUrl, user, bookingId})
       // Fetch booking details
       const bookingQuery = `
         SELECT 

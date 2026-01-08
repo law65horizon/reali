@@ -123,8 +123,8 @@ export const addressLoader = new DataLoader(async (addressIds: (number | null)[]
       c.name AS city, 
       co.name AS country, 
       a.postal_code, 
-      a.latitude, 
-      a.longitude
+      ST_Y(a.geom::geometry) as latitude,
+      ST_X(a.geom::geometry) as longitude
     FROM addresses a
     LEFT JOIN cities c ON a.city_id = c.id
     LEFT JOIN countries co ON c.country_id = co.id
