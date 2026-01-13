@@ -1,0 +1,53 @@
+type CreatePaymentIntentResponse {
+    clientSecret: String!
+  }
+
+  input CreatePaymentIntentInput {
+    bookingId: ID!
+    amount: Int!         # in cents
+    currency: String!    # "usd"
+  }
+  
+  input CreateCheckoutSessionInput {
+    bookingId: ID!
+    successUrl: String!
+    cancelUrl: String!
+  }
+
+  type Mutation {
+    createPaymentIntent(input: CreatePaymentIntentInput!): CreatePaymentIntentResponse!
+    createCheckoutSession(input: CreateCheckoutSessionInput!): CheckoutSession!
+
+    processRefund(
+      bookingId: Int!
+      amount: Float
+      reason: String
+    ): RefundResult!
+  }
+
+  type CheckoutSession {
+    sessionId: String!
+    url: String!
+    clientSecret: String!
+  }
+
+  type Payment {
+    id: ID!
+    bookingId: Int!
+    amount: Float!
+    currency: String!
+    status: String!
+    paymentMethod: String
+    createdAt: String!
+  }
+
+  type RefundResult {
+    success: Boolean!
+    refundId: String
+    message: String
+  }
+
+  type Query {
+    getPayment(bookingId: Int!): Payment
+    getPaymentHistory(userId: Int!): [Payment!]!
+  }

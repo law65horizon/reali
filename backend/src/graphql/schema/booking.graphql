@@ -1,0 +1,107 @@
+# src/graphql/schema/booking.graphql
+type RoomUnit {
+  id: ID!
+  room_type_id: ID!
+  unit_code: String
+  floor_number: Int
+  status: String
+}
+
+type User {
+  id: ID!
+  name: String!
+  uid: String!
+  email: String!
+  phone: String
+  description: String
+  created_at: String!
+  address_id: ID
+  address: Address
+}
+
+type Address {
+    id: ID!
+    street: String!
+    city: String!
+    postal_code: String
+    country: String!
+    latitude: Float
+    longitude: Float
+}
+
+type Booking {
+  id: ID!
+  unit: RoomUnit!
+  guest: User!
+  check_in: Date!
+  check_out: Date!
+  total_price: Float!
+  currency: String
+  status: String!
+  source: String
+  created_at: String
+  updated_at: String
+}
+
+input CreateBookingInput {
+  guestId: ID!
+  roomTypeId: ID!
+  checkIn: Date!
+  checkOut: Date!
+  guestCount: Int!
+  specialRequests: String
+  paymentOption: PaymentOption
+}
+
+type Query {
+  getBooking(id: ID!): Booking
+  getBookings: [Booking!]!
+  calculateBookingPrice(roomTypeId: ID!, checkIn: Date!, checkOut: Date!): BookingPriceCalculation
+}
+
+type Mutation {
+  createBooking(input: CreateBookingInput!): BookingResult!
+  updateBooking(id: ID!, status: String!): Booking!
+  cancelBooking(id: ID!): BookingResult!
+  refreshRateCalendar(roomTypeId: ID!, startDate: String!, endDate: String!): Boolean!
+}
+
+enum PaymentOption {
+  FULL
+  PARTIAL
+}
+
+type BookingResult {
+  success: Boolean!
+  message: String!
+  booking: Booking
+  errors: [String!]
+}
+
+type BookingPriceCalculation {
+  roomTypeId: Int!
+  checkIn: Date!
+  checkOut: Date!
+  nights: Int!
+  useNightlyRates: Boolean!
+  breakdown: PriceBreakdown!
+  total: Float!
+  currency: String!
+}
+
+type PriceBreakdown {
+  subtotal: Float!
+  nightlyRateDetails: [NightlyRateDetail!]
+  periodRate: Float
+  periodType: String
+  cleaningFee: Float!
+  serviceFee: Float!
+  serviceFeePercent: Float!
+  discount: Float
+  discountPercent: Float
+}
+
+type NightlyRateDetail {
+  date: Date!
+  rate: Float!
+}

@@ -1,0 +1,37 @@
+services:
+  app:
+    build: .
+    env_file:
+      - .env
+    ports:
+      - "4000:4000"  # Adjust to your server's port
+    volumes:
+      # Mount your code so changes are live
+      - ./src:/app/src
+      - ./package.json:/app/package.json
+      # Prevent node_modules from being overwritten
+      - /app/node_modules
+    environment:
+      # Add your env vars here or use env_file
+      NODE_ENV: development
+      DATABASE_URL: postgres://postgres:password@db:5432/mydb
+      DB_HOST: db
+    depends_on:
+      - db
+    # Restart on crashes during development
+    restart: unless-stopped
+
+  db:
+    image: postgis/postgis:16-3.4-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: roxxon1390
+      POSTGRES_DB: real-estate
+    ports:
+      - "5432:5432"
+    volumes:
+      # Persist database data
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

@@ -1,0 +1,92 @@
+type Address {
+    id: ID!
+    street: String!
+    city: String!
+    postal_code: String
+    country: String!
+    latitude: Float
+    longitude: Float
+}
+
+type User {
+  id: ID!
+  name: String!
+  uid: String!
+  email: String!
+  phone: String
+  description: String
+  created_at: String!
+  address_id: ID
+  address: Address
+}
+
+input UserInput {
+  name: String!
+  uid: String!
+  password: String!
+  phone: String
+  description: String
+  address: AddressInput
+}
+
+input AddressInput {
+    street: String!
+    city: String!
+    postal_code: String
+    country: String!
+    longitude: Float
+    latitude: Float
+}
+
+type AuthPayload {
+  accessToken: String!
+  refreshToken: String!
+  user: User!
+}
+
+type Query {
+  me: User,
+  activeSessions: [Session]
+}
+
+input VerifyCodeInput {
+  user: UserInput
+  email: String!
+  code: String!
+}
+
+type Mutation {
+  login(email: String!, password: String!, deviceInfo: String): CreateUserResponse!
+  register(input: UserInput!): CreateUserResponse!
+  sendVerificationCode(email: String!): SendCodeResponse!
+  verifyCode(input: VerifyCodeInput!): AuthPayload!
+  refreshAccessToken(refreshToken: String!): AuthPayload!
+  logout: Response!
+  logoutAllDevices: Response!
+  updateProfile(fullName: String, phone: String): User!
+  changePassword(currentPassword:String, newPassword: String): Response!
+}
+
+type SendCodeResponse {
+  success: Boolean!
+  message: String!
+  previewUrl: String
+}
+
+type Response {
+  success: Boolean!
+  message: String!
+}
+
+type CreateUserResponse {
+  success: Boolean!
+  message: String!
+  user: User
+}
+
+type Session {
+  sessionId: String!
+  deviceId: String!
+  createdAt: String
+  lastActivity: String
+}

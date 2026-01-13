@@ -1,0 +1,26 @@
+# src/graphql/schema/review.graphql
+type Review {
+  id: ID!
+  property: Property!
+  user: User!
+  rating: Int!
+  comment: String
+  createdAt: String!
+}
+
+input ReviewInput {
+  propertyId: ID!
+  rating: Int!
+  comment: String
+}
+
+type Query {
+  getReview(id: ID!): Review
+  getReviews(propertyId: ID!): [Review!]!
+}
+
+type Mutation {
+  createReview(input: ReviewInput!): Review!
+  updateReview(id: ID!, input: ReviewInput!): Review!
+  deleteReview(id: ID!): Boolean!
+}

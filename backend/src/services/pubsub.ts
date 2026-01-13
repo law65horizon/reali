@@ -1,0 +1,4 @@
+// src/services/pubsub.ts
+import { PubSub } from 'graphql-subscriptions';
+
+export const pubsub = new PubSub();

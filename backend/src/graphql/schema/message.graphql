@@ -1,0 +1,25 @@
+# src/graphql/schema/message.graphql
+type Message {
+  id: ID!
+  chatId: String!
+  sender: User!
+  content: String!
+  createdAt: String!
+}
+
+input MessageInput {
+  chatId: String!
+  content: String!
+}
+
+type Query {
+  getMessages(chatId: String!): [Message!]!
+}
+
+type Mutation {
+  sendMessage(input: MessageInput!): Message!
+}
+
+type Subscription {
+  messageAdded(chatId: String!): Message!
+}
