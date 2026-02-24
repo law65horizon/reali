@@ -107,7 +107,7 @@ const PropertyDetailsScreen = () => {
   }, [data?.id, toggleFavorite]);
 
   
-  console.log({data: data?.property?.realtor.created_at})
+  console.log({data: data?.reviews})
   // console.log({p: property.amenities, error})
 
 
@@ -133,7 +133,7 @@ const PropertyDetailsScreen = () => {
   };
 
   if (!loading && (error || !data)) {
-    return <ErrorState onRetry={refetch} retryText='Refetch'/>
+    return <ErrorState onRetry={() => refetch} retryText='Refetch'/>
   }
 
   if (loading) {
@@ -142,7 +142,12 @@ const PropertyDetailsScreen = () => {
         <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
-  }  
+  } 
+  
+  // console.log(propertyData.description.length)
+  
+
+
   // const isFav = () => isFavorite(data?.id);
 
   // console.log(isFav)
@@ -242,13 +247,13 @@ const PropertyDetailsScreen = () => {
             <View style={styles.detailItem}>
               <Ionicons name="bed-outline" size={20} color={colors.icon} />
               <Text style={[styles.detailText, { color: colors.text }]}>
-                {data.bedCount} beds
+                {data.bed_count} beds
               </Text>
             </View>
             <View style={styles.detailItem}>
               <MaterialIcons name="bathtub" size={20} color={colors.icon} />
               <Text style={[styles.detailText, { color: colors.text }]}>
-                {data.bathroomCount} baths
+                {data.bathroom_count} baths
               </Text>
             </View>
           </View>
@@ -303,7 +308,9 @@ const PropertyDetailsScreen = () => {
             <Ionicons name='home-outline' size={40} color={theme.colors.text} />
             <View style={{justifyContent: 'space-between', flexWrap: 'wrap', flex:1}}>
               <ThemedText style={{textTransform: 'capitalize'}} type='defaultSemiBold'>{data.property.property_type} </ThemedText>
-              <ThemedText secondary style={{flexShrink: 1, width: '100%'}}>You'll own the entire house </ThemedText>
+              <ThemedText secondary style={{flexShrink: 1, width: '100%'}}>
+                {data.property.property_type == 'house' ?`You'll own the entire house`: `You'll be staying in a room`} 
+              </ThemedText>
             </View>
           </View>
           <View style={{flexDirection: 'row', alignItems:'center', gap: 10, borderBottomWidth: 0, borderColor: theme.colors.border, paddingBottom: 5}}>                          
@@ -323,10 +330,10 @@ const PropertyDetailsScreen = () => {
             About this place
           </Text> */}
           <Text style={[styles.description, { color: colors.text }]}>
-            {data.description?.length! < 20? data.description : propertyData.description}
+            {data.description?.length! > 30? data.description : propertyData.description}
           </Text>
 
-          {true && <TouchableOpacity
+          {data.description?.length > 450 && <TouchableOpacity
             style={[styles.showMoreButton, { backgroundColor: colors.border, borderWidth: 0 }]}
             onPress={() => setShowAllAmenities(!showAllAmenities)}
           >
@@ -377,29 +384,29 @@ const PropertyDetailsScreen = () => {
         <View style={[styles.divider, { borderBottomColor: colors.border }]} />
 
         {/* Reviews */}
-        <View style={[styles.section, { backgroundColor: colors.background }]}>
+        {data?.reviews && <View style={[styles.section, { backgroundColor: colors.background }]}>
           <View style={styles.reviewsHeader}>
             <View style={styles.ratingLarge}>
               <Ionicons name="star" size={20} color={colors.warning || '#F59E0B'} />
               <Text style={[styles.ratingLargeText, { color: colors.text }]}>
-                {propertyData.rating}
+                {data?.avg_rating}
               </Text>
               <Text style={[styles.reviewCountLarge, { color: colors.textSecondary }]}>
-                · {propertyData.reviewCount} reviews
+                · {data?.reviews.length} reviews
               </Text>
             </View>
           </View>
 
-          {propertyData.reviews.map((review, index) => (
+          {data.reviews.map((review: any, index: number) => (
             <View key={index} style={styles.reviewItem}>
               <View style={styles.reviewHeader}>
-                <Image source={{ uri: review.avatar }} style={styles.reviewAvatar} />
+                <Image source={{ uri: propertyData.reviews[0].avatar }} style={styles.reviewAvatar} />
                 <View style={styles.reviewHeaderText}>
                   <Text style={[styles.reviewUser, { color: colors.text }]}>
-                    {review.user}
+                    {review.user?.name}
                   </Text>
                   <Text style={[styles.reviewDate, { color: colors.textSecondary }]}>
-                    {review.date}
+                    {review.created_at}
                   </Text>
                 </View>
               </View>
@@ -412,12 +419,12 @@ const PropertyDetailsScreen = () => {
             </View>
           ))}
 
-          <TouchableOpacity style={[styles.showMoreButton, { borderColor: colors.border }]}>
+          {data.totalReviews > data.reviews.length &&<TouchableOpacity style={[styles.showMoreButton, { borderColor: colors.border }]}>
             <Text style={[styles.showMoreText, { color: colors.text }]}>
-              Show all {propertyData.reviewCount} reviews
+              Show all {data.totalReviews} reviews
             </Text>
-          </TouchableOpacity>
-        </View>
+          </TouchableOpacity>}
+        </View>}
 
         <View style={[styles.divider, { borderBottomColor: colors.border }]} />
 
@@ -449,7 +456,7 @@ const PropertyDetailsScreen = () => {
                 source={require('@/assets/images/host-avatar.jpg')} // Replace with actual host image
                 style={styles.hostAvatar}
               />
-              <ThemedText type='title'>{data.property.realtor.name}</ThemedText>
+              <ThemedText type='subtitle'>{data.property.realtor.name}</ThemedText>
               <ThemedText type='defaultSemiBold'>SuperHost</ThemedText>
             </View>
             <Line orientation='vertical' style={{marginHorizontal: 40}} />
@@ -529,9 +536,9 @@ const PropertyDetailsScreen = () => {
       }]}>
         <View style={styles.priceContainer}>
           <Text style={[styles.price, { color: colors.text }]}>
-            ${data.derivedPrice || data.basePrice}
+            ${data.derivedPrice || data.base_price}
             <Text style={[styles.priceLabel, { color: colors.textSecondary, textTransform: 'capitalize' }]}>
-              {' '}/ {data?.duration}
+              {' '}/ {data?.duration || 'night'}
             </Text>
           </Text>
           <View style={styles.priceRating}>

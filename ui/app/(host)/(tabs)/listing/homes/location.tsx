@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Dimensions,
-    FlatList,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 
@@ -162,7 +162,7 @@ const Location = () => {
   };
 
   return (
-    <ThemedView plain secondary style={{ width, height, paddingVertical: 22 }}>
+    <ThemedView plain secondary style={{ width, height, paddingTop: 60 }}>
       <ThemedText style={{ marginBottom: 12, paddingHorizontal: 22 }}>
         Please pick your exact location
       </ThemedText>

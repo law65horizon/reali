@@ -1,8 +1,11 @@
 // screens/TripsDashboard.tsx
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Dimensions,
   Image,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,250 +13,90 @@ import {
   View
 } from 'react-native';
 // import { useBookingsStore, Booking, BookingStatus } from '../store/bookingsStore';
+import { ThemedText } from '@/components/ThemedText';
+import { useAuthStore } from '@/stores/authStore';
 import { Booking } from '@/stores/bookingStore';
 import { useTheme } from '@/theme/theme';
+import { gql, useQuery } from '@apollo/client';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width - 40;
 
-const mockBookingsData = [
-  {
-    id: 'booking1',
-    type: 'hotel',
-    status: 'upcoming',
-    property: {
-      id: 'property1',
-      title: 'Luxury Beachfront Resort',
-      address: '123 Beach Ave, Sunny Beach',
-      city: 'Sunny Beach',
-      country: 'USA',
-      imageUrl: 'https://res.cloudinary.com/dajzo2zpq/image/upload/v1752247182/properties/wlf2uijbultztvqptnka.jpg',
-      rating: 4.8,
-      reviewCount: 150,
-    },
-    host: {
-      id: 'host1',
-      name: 'John Doe',
-      avatar: 'https://example.com/host1.jpg',
-      phone: '+1 234 567 890',
-      email: 'johndoe@example.com',
-      responseTime: '1 hour',
-    },
-    checkIn: '2025-12-01T14:00:00Z',
-    checkOut: '2025-12-07T11:00:00Z',
-    guests: 2,
-    totalPrice: 1200,
-    currency: 'USD',
-    bookingReference: 'ABC12345',
-    createdAt: '2025-10-01T10:00:00Z',
-    payments: [
-      {
-        id: 'payment1',
-        amount: 1200,
-        currency: 'USD',
-        date: '2025-10-01T10:00:00Z',
-        status: 'paid',
-        method: 'credit card',
-        type: 'full',
-      },
-    ],
-    specialRequests: 'Late check-in at 10 PM.',
-    cancellationPolicy: 'Free cancellation until 24 hours before check-in.',
-    checkInInstructions: 'Check-in at the front desk after 2 PM.',
-    accessCode: 'XYZ987654321',
-    securityDeposit: {
-      amount: 200,
-      status: 'held',
-      returnDate: '2025-12-15T00:00:00Z',
-    },
-    canModify: true,
-    canCancel: true,
-  },
-  {
-    id: 'booking2',
-    type: 'rental',
-    status: 'active',
-    property: {
-      id: 'property2',
-      title: 'Cozy Mountain Cabin',
-      address: '456 Mountain Rd, Mountain Town',
-      city: 'Mountain Town',
-      country: 'Canada',
-      imageUrl: 'https://res.cloudinary.com/dajzo2zpq/image/upload/v1752247182/properties/wlf2uijbultztvqptnka.jpg',
-      rating: 4.5,
-      reviewCount: 75,
-    },
-    host: {
-      id: 'host2',
-      name: 'Alice Smith',
-      avatar: 'https://example.com/host2.jpg',
-      phone: '+1 555 123 4567',
-      email: 'alicesmith@example.com',
-      responseTime: '2 hours',
-    },
-    checkIn: '2025-11-15T16:00:00Z',
-    checkOut: '2025-11-20T12:00:00Z',
-    guests: 4,
-    totalPrice: 800,
-    currency: 'CAD',
-    bookingReference: 'XYZ98765',
-    createdAt: '2025-08-20T08:30:00Z',
-    payments: [
-      {
-        id: 'payment2',
-        amount: 800,
-        currency: 'CAD',
-        date: '2025-08-20T08:30:00Z',
-        status: 'paid',
-        method: 'bank transfer',
-        type: 'deposit',
-      },
-    ],
-    specialRequests: 'Pet-friendly cabin, please.',
-    cancellationPolicy: '50% refund if cancelled 7 days before check-in.',
-    checkInInstructions: 'Key pickup at local office.',
-    accessCode: 'CABIN12345',
-    securityDeposit: {
-      amount: 150,
-      status: 'pending',
-    },
-    canModify: false,
-    canCancel: true,
-  },
-  {
-    id: 'booking3',
-    type: 'purchase',
-    status: 'completed',
-    property: {
-      id: 'property3',
-      title: 'Downtown Apartment',
-      address: '789 City Blvd, City Center',
-      city: 'City Center',
-      country: 'UK',
-      imageUrl: 'https://res.cloudinary.com/dajzo2zpq/image/upload/v1752247182/properties/wlf2uijbultztvqptnka.jpg',
-      rating: 4.9,
-      reviewCount: 200,
-    },
-    host: {
-      id: 'host3',
-      name: 'Emma Johnson',
-      avatar: 'https://example.com/host3.jpg',
-      phone: '+44 1234 567890',
-      email: 'emmajohnson@example.com',
-      responseTime: '30 minutes',
-    },
-    checkIn: '2025-05-01T15:00:00Z',
-    checkOut: '2025-05-02T10:00:00Z',
-    guests: 1,
-    totalPrice: 350000,
-    currency: 'GBP',
-    bookingReference: 'LMN67890',
-    createdAt: '2025-03-15T12:00:00Z',
-    payments: [
-      {
-        id: 'payment3',
-        amount: 350000,
-        currency: 'GBP',
-        date: '2025-03-15T12:00:00Z',
-        status: 'paid',
-        method: 'mortgage',
-        type: 'full',
-      },
-    ],
-    specialRequests: 'Please include parking spot.',
-    cancellationPolicy: 'No cancellations after purchase.',
-    checkInInstructions: 'Owner will meet at the property for keys.',
-    accessCode: 'DTA12345',
-    securityDeposit: {
-      amount: 5000,
-      status: 'returned',
-      returnDate: '2025-05-05T00:00:00Z',
-    },
-    canModify: false,
-    canCancel: false,
-  },
-  {
-    id: 'booking4',
-    type: 'rental',
-    status: 'cancelled',
-    property: {
-      id: 'property4',
-      title: 'Luxe Beach House',
-      address: '101 Ocean Ave, Coastal Town',
-      city: 'Coastal Town',
-      country: 'Australia',
-      imageUrl: 'https://res.cloudinary.com/dajzo2zpq/image/upload/v1752247182/properties/wlf2uijbultztvqptnka.jpg',
-      rating: 4.7,
-      reviewCount: 50,
-    },
-    host: {
-      id: 'host4',
-      name: 'David Miller',
-      avatar: 'https://example.com/host4.jpg',
-      phone: '+61 412 345 678',
-      email: 'davidmiller@example.com',
-      responseTime: '4 hours',
-    },
-    checkIn: '2025-07-10T14:00:00Z',
-    checkOut: '2025-07-17T11:00:00Z',
-    guests: 3,
-    totalPrice: 2500,
-    currency: 'AUD',
-    bookingReference: 'OPQ45678',
-    createdAt: '2025-06-05T15:00:00Z',
-    payments: [
-      {
-        id: 'payment4',
-        amount: 2500,
-        currency: 'AUD',
-        date: '2025-06-05T15:00:00Z',
-        status: 'pending',
-        method: 'credit card',
-        type: 'full',
-      },
-    ],
-    specialRequests: 'Include breakfast service.',
-    cancellationPolicy: 'Free cancellation up to 24 hours before check-in.',
-    checkInInstructions: 'Check-in at front desk.',
-    accessCode: 'BEACH12345',
-    securityDeposit: {
-      amount: 300,
-      status: 'held',
-    },
-    canModify: true,
-    canCancel: true,
-  },
-];
+const GET_MY_BOOKINGS = gql`
+query MyBookings {
+  myBookings {
+    id
+    property {
+      id
+      title
+      address {
+        city
+        country
+        street
+        postal_code
+      }
+    }
+    checkOut
+    checkIn
+    guestCount
+    cancellationPolicy
+    currency
+    specialRequests
+    totalPrice
+    type
+    source
+    status
+    updated_at
+    created_at
+  }
+}
+`
 
 export default function TripsDashboard({ navigation }: any) {
   const { theme } = useTheme();
+  const {height} = Dimensions.get('screen')
+  const user = useAuthStore((state) => state.user)
 //   const bookings = useBookingsStore((state) => state.bookings);
   const [activeTab, setActiveTab] = useState<'current' | 'upcoming' | 'past'>('current');
-  const bookings = mockBookingsData
+  const [openDropDown, setOpenDropDown] = useState(false)
+  const {data, error, loading, refetch} = useQuery(GET_MY_BOOKINGS)
+  const [isRefetching, setIsRefetching] = useState(false)
+  const bookings: any[] = data?.myBookings || []
+  // console.log(data?.myBookings[0])
+  console.log({error})
   const categorizedBookings = useMemo(() => {
+    // console.log({bookings})
     const now = new Date();
     
     const current = bookings.filter(
       (b) =>
         b.status === 'active' ||
-        (b.status === 'upcoming' &&
+        (b.status === 'confirmed' &&
           new Date(b.checkIn) <= new Date(now.getTime() + 24 * 60 * 60 * 1000))
     );
 
     const upcoming = bookings.filter(
-      (b) =>
-        b.status === 'upcoming' &&
+      (b) => (b.status === 'confirmed' || b.status === 'pending') &&
         new Date(b.checkIn) > new Date(now.getTime() + 24 * 60 * 60 * 1000)
     );
 
     const past = bookings.filter(
-      (b) => b.status === 'completed' || b.status === 'cancelled'
+      (b) => b.status === 'cancelled' || b.status === 'completed'
     );
 
     return { current, upcoming, past };
   }, [bookings]);
+
+  useEffect(() => {
+  const fetchData = async () => {
+    await refetch();
+  };
+
+  fetchData();
+}, [user]);
+
 
   const activeBookings = categorizedBookings[activeTab];
 
@@ -265,7 +108,7 @@ export default function TripsDashboard({ navigation }: any) {
     if (booking.status === 'active') {
       const daysLeft = Math.ceil((checkOut.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       return { label: 'Days remaining', value: daysLeft };
-    } else if (booking.status === 'upcoming') {
+    } else if (booking.status === 'completed') {
       const daysUntil = Math.ceil((checkIn.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       return { label: 'Days until check-in', value: daysUntil };
     } else {
@@ -293,7 +136,7 @@ export default function TripsDashboard({ navigation }: any) {
     switch (type) {
       case 'hotel':
         return 'Hotel Stay';
-      case 'rental':
+      case 'apartment':
         return 'Rental Property';
       case 'purchase':
         return 'Property Purchase';
@@ -311,13 +154,18 @@ export default function TripsDashboard({ navigation }: any) {
         key={booking.id}
         style={[styles.tripCard, { backgroundColor: theme.colors.card }]}
         // onPress={() => navigation.navigate('BookingDetails', { bookingId: booking.id })}
-        onPress={() => router.push('/reservations/details')}
+        onPress={() => router.push({
+          pathname: '/reservations/details/[id]',
+          params: {id: booking.id}
+        })}
         activeOpacity={0.9}
       >
         {/* Image Section with Gradient Overlay */}
         <View style={styles.imageSection}>
           <Image
-            source={{ uri: booking.property.imageUrl }}
+            source={{ uri:  
+              'https://res.cloudinary.com/dajzo2zpq/image/upload/v1770056771/properties/qsazerxt69htzu8n4xtx.jpgs'
+            }}
             style={styles.tripImage}
           />
           {/* <LinearGradient
@@ -328,7 +176,7 @@ export default function TripsDashboard({ navigation }: any) {
           {/* Type Badge */}
           <View style={[styles.typeBadge, { backgroundColor: theme.colors.card }]}>
             <Ionicons
-              name={booking.type === 'hotel' ? 'bed' : booking.type === 'rental' ? 'home' : 'key'}
+              name={booking.type === 'hotel' ? 'bed' : booking.type === 'apartment' ? 'home' : 'key'}
               size={14}
               color={theme.colors.primary}
             />
@@ -346,8 +194,8 @@ export default function TripsDashboard({ navigation }: any) {
 
           {/* Location on Image */}
           <View style={styles.locationOverlay}>
-            <Text style={styles.cityText}>{booking.property.city}</Text>
-            <Text style={styles.countryText}>{booking.property.country}</Text>
+            <Text style={styles.cityText}>{booking.property.address.city}</Text>
+            <Text style={styles.countryText}>{booking.property.address.country}</Text>
           </View>
         </View>
 
@@ -377,10 +225,10 @@ export default function TripsDashboard({ navigation }: any) {
 
             <View style={[styles.infoBox, { backgroundColor: theme.colors.backgroundSec }]}>
               <Text style={[styles.infoValue, { color: theme.colors.text }]}>
-                {booking.guests}
+                {booking.guestCount}
               </Text>
               <Text style={[styles.infoLabel, { color: theme.colors.textSecondary }]}>
-                {booking.guests === 1 ? 'Guest' : 'Guests'}
+                {booking.guestCount === 1 ? 'Guest' : 'Guests'}
               </Text>
             </View>
 
@@ -400,22 +248,132 @@ export default function TripsDashboard({ navigation }: any) {
             onPress={() => {
               if (booking.status === 'active' || isToday) {
                 // Navigate to check-in instructions or directions
-                navigation.navigate('BookingDetails', { bookingId: booking.id });
+                router.push({
+                  pathname: '/reservations/details/[id]',
+                  params: {id: booking.id}
+                })
               } else {
-                navigation.navigate('BookingDetails', { bookingId: booking.id });
+                router.push({
+                  pathname: '/reservations/details/[id]',
+                  params: {id: booking.id}
+                })
               }
             }}
           >
             <Text style={[styles.actionButtonText, {color: theme.colors.text}]}>
               {booking.status === 'active' ? 'Get directions' : isToday ? 'Check-in Info' : 'View Trip'}
             </Text>
-            <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+            <Ionicons name="arrow-forward" size={18} color={theme.colors.textSecondary} />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
   };
 
+  const refetchData = async() => {
+    if (isRefetching) return
+    try {
+      setIsRefetching(true)
+      await refetch()
+    } catch (error) {
+      Alert.alert('Failed to Refetch Data')
+    } finally {
+      setIsRefetching(false)
+    }
+  }
+
+  if (loading) return (
+    <View style={{justifyContent: 'center', alignItems: 'center', height}}>
+      <ActivityIndicator size={'large'} color={theme.colors.text} />
+    </View>
+  )
+
+  if (!user) return (
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      {/* Header */}
+
+      {/* Not Logged In Content */}
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        <View style={styles.notLoggedInContainer}>
+          {/* Icon Section */}
+          <View style={[styles.notLoggedInIconContainer, { backgroundColor: theme.colors.backgroundSec }]}>
+            <Ionicons name="log-in-outline" size={64} color={theme.colors.primary} />
+          </View>
+
+          {/* Main Message */}
+          <Text style={[styles.notLoggedInTitle, { color: theme.colors.text }]}>
+            Sign in to view your trips
+          </Text>
+          <Text style={[styles.notLoggedInSubtitle, { color: theme.colors.textSecondary }]}>
+            Keep track of your reservations and get real-time updates on your bookings
+          </Text>
+
+          {/* Features List */}
+          <View style={styles.featuresList}>
+            {[
+              { icon: 'calendar-outline', text: 'Track current and upcoming trips' },
+              { icon: 'notifications-outline', text: 'Get booking updates and reminders' },
+              { icon: 'map-outline', text: 'Access directions and check-in info' },
+              { icon: 'time-outline', text: 'View your booking history' },
+            ].map((feature, index) => (
+              <View key={index} style={styles.featureItem}>
+                <View style={[styles.featureIconContainer, { backgroundColor: theme.colors.card }]}>
+                  <Ionicons name={feature.icon as any} size={22} color={theme.colors.primary} />
+                </View>
+                <Text style={[styles.featureText, { color: theme.colors.text }]}>
+                  {feature.text}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Action Buttons */}
+          <TouchableOpacity
+            style={[styles.signInButton, { backgroundColor: theme.colors.primary }]}
+            onPress={() => router.push('/(guest)/(auth)/sign_in')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.signInButtonText}>Sign In</Text>
+            <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+
+          <View style={styles.signUpRow}>
+            <Text style={[styles.signUpText, { color: theme.colors.textSecondary }]}>
+              Don't have an account?
+            </Text>
+            <TouchableOpacity
+              onPress={() => router.push('/(guest)/(auth)/sign_up')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.signUpLink, { color: theme.colors.primary }]}>
+                Sign Up
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Browse Properties Link */}
+          <View style={[styles.divider, { backgroundColor: theme.colors.backgroundSec }]} />
+          
+          <TouchableOpacity
+            style={[styles.browseButton, { backgroundColor: theme.colors.card }]}
+            onPress={() => router.push('/(guest)/(tabs)/home/(toptabs)/Homes')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="search-outline" size={20} color={theme.colors.text} />
+            <Text style={[styles.browseButtonText, { color: theme.colors.text }]}>
+              Browse Properties
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
+  )
+
+  console.log({user})
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Custom Header */}
@@ -432,15 +390,35 @@ export default function TripsDashboard({ navigation }: any) {
           
           <TouchableOpacity
             style={[styles.menuButton, { backgroundColor: theme.colors.card }]}
-            onPress={() => {}}
+            onPress={() => setOpenDropDown(!openDropDown)}
           >
             <Ionicons name="options-outline" size={22} color={theme.colors.text} />
           </TouchableOpacity>
+        </View>
+        {openDropDown && (
+          <View style={[styles.dropDown, {backgroundColor: theme.colors.card}]}>
+            {['current', 'upcoming', 'past'].map((item) => (
+              <TouchableOpacity key={item} onPress={() => {
+                setActiveTab(item as any)
+                setOpenDropDown(false)
+              }}>
+                <ThemedText style={{fontSize: 16, fontWeight: 600, textDecorationLine: activeTab == item? 'underline': 'none', textTransform: 'capitalize'}}>
+                  {item}
+                </ThemedText>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+        <View style={{position: 'relative', paddingTop: 10}}>
+          <View style={[styles.activeTab, {paddingVertical: 10, paddingHorizontal: 20, backgroundColor: theme.colors.card, borderRadius: 20}]}>
+            <ThemedText style={{textTransform: 'capitalize'}}>{activeTab}</ThemedText>
+          </View>
         </View>
       </View>
 
       {/* Trips List */}
       <ScrollView
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetchData} />}
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -528,6 +506,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
+  dropDown: {
+    position: 'absolute', 
+    top: 120, 
+    alignSelf: 'flex-end', 
+    marginRight: 20, 
+    zIndex: 10,
+    padding: 20,
+    borderRadius: 15,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    gap: 15,
+    width: 120
+  },
   tabContainer: {
     flexDirection: 'row',
     padding: 4,
@@ -571,6 +565,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     paddingTop: 10,
+    paddingBottom: 50
   },
   tripCard: {
     borderRadius: 24,
@@ -746,5 +741,123 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+  },
+
+  // Not Logged In Styles
+  notLoggedInContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  notLoggedInIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 32,
+  },
+  notLoggedInTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    marginBottom: 12,
+    textAlign: 'center',
+    letterSpacing: -0.5,
+  },
+  notLoggedInSubtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 40,
+    paddingHorizontal: 10,
+  },
+  featuresList: {
+    width: '100%',
+    marginBottom: 40,
+    gap: 16,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    paddingVertical: 4,
+  },
+  featureIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  featureText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 22,
+  },
+  signInButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    borderRadius: 16,
+    width: '100%',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    marginBottom: 20,
+  },
+  signInButtonText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  signUpRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 32,
+  },
+  signUpText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  signUpLink: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  divider: {
+    width: '100%',
+    height: 1,
+    marginBottom: 24,
+  },
+  browseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 14,
+    width: '100%',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  browseButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

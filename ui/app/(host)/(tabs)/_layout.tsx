@@ -5,7 +5,7 @@ import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useTheme } from '@/theme/theme';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { StyleSheet } from 'react-native';
 
 const MemoizedIconSymbol = React.memo(IconSymbol);
@@ -49,6 +49,19 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="bookings"
+        options={{
+          title: 'Bookings',
+          tabBarIcon: ({color, focused}) => (
+            <Ionicons 
+              size={focused ? 26 : 24} 
+              name={focused ? 'calendar' : 'calendar-outline'} 
+              color={color} 
+            />
+          )
+        }}
+      />
+      <Tabs.Screen
         name="listing"
         options={{
           title: 'Listing',
@@ -56,6 +69,19 @@ export default function TabLayout() {
             <MaterialCommunityIcons 
               size={focused ? 26 : 24} 
               name={focused ? 'book-plus' : 'book-play-outline'} 
+              color={color} 
+            />
+          )
+        }}
+      />
+      <Tabs.Screen
+        name="messages"
+        options={{
+          title: 'Messages',
+          tabBarIcon: ({color, focused}) => (
+            <Ionicons 
+              size={focused ? 26 : 24} 
+              name={focused ? 'chatbubbles' : 'chatbubbles-outline'} 
               color={color} 
             />
           )
@@ -91,7 +117,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 80,
+    // height:0,
     paddingTop: 8,
     paddingBottom: 8,
     borderTopLeftRadius: 16,

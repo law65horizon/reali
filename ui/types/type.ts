@@ -4,6 +4,18 @@ export interface ImageProps {
   loading?: boolean
 }
 
+export type AddressDetails = {
+  country: string;
+  state: string;
+  city: string;
+  street?: string;
+  postcode: string;
+  road?: string;
+  display_name?: string;
+  latitude?: number;
+  longitude?: number;
+};
+
 export interface ItineraryProps {
     title: string
     description: string

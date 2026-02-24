@@ -24,16 +24,16 @@ export function getNightlyRatesInRange(
   }
 
   // Filter data to only include the dates within the range
-  return data.filter(entry => {
+  return data?.filter(entry => {
     const entryDate = dayjs(entry.date);
 
     // Check if the entry date is within the check-in and check-out range
-    return entryDate.isBetween(checkIn, checkOut, null, '[]');
+    return entryDate?.isBetween(checkIn, checkOut, null, '[]');
   });
 }
 
 export function sumNightlyRates(entries: RateCalendarEntry[]): number {
-  return entries.reduce((total, entry) => {
+  return entries?.reduce((total, entry) => {
     // Only add the nightly rate if the entry is not blocked (optional condition)
     if (!entry.is_blocked) {
       return total + entry.nightly_rate;

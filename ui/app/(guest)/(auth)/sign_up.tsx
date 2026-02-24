@@ -50,6 +50,7 @@ export default function SignUpScreen() {
   const [code, setCode] = useState('');
   const [showDobPicker, setShowDobPicker] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [signingUp, setSigningUp] = useState(false);
 
   const [sendCode, { loading: sendingCode }] = useMutation(SEND_VERIFICATION_CODE);
   const [verifyCode, { loading: verifying }] = useMutation(VERIFY_CODE);
@@ -113,7 +114,7 @@ export default function SignUpScreen() {
       Alert.alert('Validation Error', Object.values(errors).join('\n'));
       return;
     }
-
+    setSigningUp(true)
     try {
       const {data} = await register({
         variables: {
@@ -127,11 +128,17 @@ export default function SignUpScreen() {
         }
       })
 
-      if (data.register.success) {
+      if (data?.register?.success) {
         await handleSendCode()
+      } else {
+        Alert.alert('Error', data?.register.message)
+        return
       }
-    } catch (error) {
-      
+    } catch (error:any) {
+      console.log('sisoi')
+      Alert.alert('Error', error.message || 'Something went wrong');
+    } finally {
+      setSigningUp(false)
     }
   }
 
@@ -143,6 +150,7 @@ export default function SignUpScreen() {
         variables: { email: form.email.toLocaleLowerCase().trim() },
       });
 
+      console.log({data})
       if (data.sendVerificationCode.success) {
         setStep('code');
         Alert.alert('Success', data.sendVerificationCode.message);
@@ -180,6 +188,7 @@ export default function SignUpScreen() {
         data.verifyCode.accessToken,
         data.verifyCode.refreshToken,
         data.verifyCode.user,
+        data.verifyCode.sessionId,
         data.verifyCode.user.role || 'guest'
       );
 
@@ -293,8 +302,8 @@ export default function SignUpScreen() {
           <FormField
             title="First Name"
             value={form.firstName}
-            handleChangeText={(text) => setForm({ ...form, firstName: text })}
-            otherStyles={[
+            onChangeText={(text) => setForm({ ...form, firstName: text })}
+            style={[
               styles.input,
               touched.firstName && errors.firstName ? styles.errorBorder : null,
             ]}
@@ -303,8 +312,8 @@ export default function SignUpScreen() {
           <FormField
             title="Last Name"
             value={form.lastName}
-            handleChangeText={(text) => setForm({ ...form, lastName: text })}
-            otherStyles={[
+            onChangeText={(text) => setForm({ ...form, lastName: text })}
+            style={[
               styles.input,
               touched.lastName && errors.lastName ? styles.errorBorder : null,
             ]}
@@ -355,9 +364,9 @@ export default function SignUpScreen() {
         <FormField
           title="Email"
           value={form.email}
-          handleChangeText={(text) => setForm({ ...form, email: text })}
+          onChangeText={(text) => setForm({ ...form, email: text })}
           keyboardType="email-address"
-          otherStyles={[
+          style={[
             styles.input,
             touched.email && errors.email ? styles.errorBorder : null,
           ]}
@@ -368,10 +377,10 @@ export default function SignUpScreen() {
         <FormField
           title="Phone"
           value={form.phone}
-          handleChangeText={(text) => setForm({ ...form, phone: text })}
+          onChangeText={(text) => setForm({ ...form, phone: text })}
           keyboardType="phone-pad"
           placeholder="e.g. +1234567890"
-          otherStyles={[
+          style={[
             styles.input,
             touched.phone && errors.phone ? styles.errorBorder : null,
           ]}
@@ -383,8 +392,8 @@ export default function SignUpScreen() {
           title='Password'
           type='password'
           value={form.password}
-          handleChangeText={(text) => setForm({...form, password: text})}
-          otherStyles={[
+          onChangeText={(text) => setForm({...form, password: text})}
+          style={[
             styles.input,
           ]}
           onBlur={() => setTouched((t) => ({...t, password: true}))}
@@ -397,8 +406,8 @@ export default function SignUpScreen() {
             type='password'
             title='Confirm Password'
             value={form.confirmPassword}
-            handleChangeText={(text) => setForm({...form, confirmPassword: text})}
-            otherStyles={[
+            onChangeText={(text) => setForm({...form, confirmPassword: text})}
+            style={[
               styles.input,
               touched.confirmPassword && errors.confirmPassword ? styles.errorBorder : null,
             ]}
@@ -432,10 +441,10 @@ export default function SignUpScreen() {
         <TouchableOpacity
           style={[styles.button, { backgroundColor: theme.colors.primary }]}
           onPress={handleSignUp}
-          disabled={registering}
+          disabled={signingUp}
         >
-          {sendingCode ? (
-            <ActivityIndicator animating={registering}  color={theme.colors.buttonText ?? '#FFFFFF'} />
+          {signingUp ? (
+            <ActivityIndicator animating={signingUp}  color={theme.colors.buttonText ?? '#FFFFFF'} />
           ) : (
             <ThemedText type="defaultSemiBold" style={{ color: theme.colors.buttonText ?? '#FFFFFF' }}>
               Agree and continue

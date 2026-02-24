@@ -47,12 +47,12 @@ const GET_ROOM_TYPE = gql`
       name
       description
       capacity
-      basePrice
-      weeklyRate
+      base_price
+      weekly_rate
       currency
-      monthlyRate
+      monthly_rate
       images {
-        url
+        cdn_url
         id
       }
       currency
@@ -83,9 +83,9 @@ const CREATE_PAYMENT_INTENT = gql`
       clientSecret
     }
   }
-`;
+`; 
 
-const CREATE_CHECKOUT_SESSION = gql`
+export const CREATE_CHECKOUT_SESSION = gql`
   mutation CreateCheckoutSession($input: CreateCheckoutSessionInput!) {
     createCheckoutSession(input: $input) {
       clientSecret
@@ -114,7 +114,7 @@ const ReservationScreen = () => {
   const [checkInDate, setCheckInDate] = useState<string | null>(null);
   const [checkOutDate, setCheckOutDate] = useState<string | null>(null);
   const [guests, setGuests] = useState(1);
-  const [paymentOption, setPaymentOption] = useState('full');
+  const [paymentOption, setPaymentOption] = useState<'full' | 'partial'>('full');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   
   const [dateModalVisible, setDateModalVisible] = useState(false);
@@ -197,14 +197,16 @@ const ReservationScreen = () => {
     setLoading(true);
     try {
       const amountInCents = Math.round(pricingInfo.price * 100);
+      console.log({user})
       const bookingResult = await createBooking({
         variables: {
           input: {
-            guestId: user.id,
+            guestId: user.id || 3,
             roomTypeId: query,
             checkIn: checkInDate,
             checkOut: checkOutDate,
-            guestCount: guests
+            guestCount: guests,
+            source: 'mobile app'
           }
         }
       })
@@ -246,6 +248,7 @@ const ReservationScreen = () => {
             bookingId,
             successUrl,
             cancelUrl,
+            paymentOption: paymentOption.toUpperCase(),
           }
         }
       });
@@ -505,7 +508,7 @@ const ReservationScreen = () => {
   }, [checkInDate, checkOutDate, guests, agreedToTerms, priceData, roomTypeData]);
 
   // Handle booking submission
-  
+  console.log({user})
 
   console.log({data, loading, error: error?.message})
   if (roomTypeLoading) {
@@ -705,7 +708,14 @@ const ReservationScreen = () => {
             !isValidReservation && styles.ctaButtonDisabled,
           ]}
           disabled={!isValidReservation}
-          onPress={handleCreateBooking}
+          onPress={() => {
+            if(!user) {
+              console.log({users: user})
+              router.push('/(guest)/(auth)/auth_page')
+            } else {
+              handleCreateBooking()
+            }
+          }}
         >
           {loading 
           ? <ActivityIndicator animating={loading} color={'white'} />

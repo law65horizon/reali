@@ -1,5 +1,6 @@
 import { ThemedText } from '@/components/ThemedText';
 import CustomPriceRangeSlider from '@/components/ui/PriceRange';
+import { useFilterStore } from '@/stores/useFilterStore';
 import { useTheme } from '@/theme/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -8,7 +9,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-type ListingType = 'rental' | 'purchase' | 'hotels';
+type ListingType = 'rental' | 'purchase' | 'hotel';
 
 const MIN_PRICE = 0;
 const MAX_PRICE = 10000;
@@ -25,7 +26,7 @@ const AMENITIES_BY_TYPE: Record<ListingType, Record<string, string[]>> = {
     "Building Features": ["Pool", "Elevator", "Gated", "24/7 Security"],
     "Safety": ["Smoke alarm"],
   },
-  hotels: {
+  hotel: {
     "Key Amenities": ["Breakfast", "Wifi", "TV", "Air conditioning"],
     "Building Features": ["Pool", "Gym", "Doorman"],
     "Safety": ["Smoke alarm", "Carbon monoxide alarm"],
@@ -66,16 +67,19 @@ export default function FilterScreen() {
 	const insets = useSafeAreaInsets();
 	const {theme} = useTheme()
 	const navigation = useNavigation()
+	const setFilter = useFilterStore((state) => state.setFilter)
+	const clearFilter = useFilterStore((state) => state.clearAll)
+	const variables = useFilterStore((state) => state.variables)
 	
 
 	const [listingType, setListingType] = useState<ListingType>('rental');
-	const [priceRange, setPriceRange] = useState<{min: number, max: number}>({min: 500, max: 5000});
-	const [bedrooms, setBedrooms] = useState<number | 'any'>('any');
-	const [bathrooms, setBathrooms] = useState<number | 'any'>('any');
-	const [beds, setBeds] = useState<number | 'any'>('any');
+	const [priceRange, setPriceRange] = useState<{min: number, max: number}>({min: variables?.minPrice??50, max: variables?.maxPrice??450});
+	const [bedrooms, setBedrooms] = useState<number | undefined>(undefined);
+	const [bathrooms, setBathrooms] = useState<number | undefined>(variables?.bathrooms??undefined);
+	const [beds, setBeds] = useState<number | undefined>(variables?.beds??undefined);
 	const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
-	const [propertyTypes, setPropertyTypes] = useState<string[]>([]);
-	const [amenities, setAmenities] = useState<string[]>([]);
+	const [propertyTypes, setPropertyTypes] = useState<string[]>(variables?.propertyType??[]);
+	const [amenities, setAmenities] = useState<string[]>(variables?.amenities??[]);
 	const [features, setFeatures] = useState<string[]>([]);
 
 	const histogramData = useMemo(() => [5, 12, 28, 45, 62, 78, 95, 88, 72, 58, 45, 35, 28, 22, 18, 12, 8, 5, 3, 2], []);
@@ -85,7 +89,7 @@ export default function FilterScreen() {
 		() => ({
 			rental: ['Apartment', 'House', 'Condo', 'Townhouse', 'Villa'],
 			purchase: ['House', 'Apartment', 'Condo', 'Townhouse', 'Villa', 'Land'],
-			hotels: ['Resort', 'Boutique', 'Business', 'All-inclusive'],
+			hotel: ['Resort', 'Boutique', 'Business', 'All-inclusive'],
 		}),
 		[]
 	);
@@ -108,22 +112,22 @@ export default function FilterScreen() {
 		else setList([...list, item]);
 	}, []);
 
-	const incrementCount = useCallback((value: number | 'any', setValue: (v: number | 'any') => void) => {
-		if (value === 'any') setValue(1);
+	const incrementCount = useCallback((value: number | undefined, setValue: (v: number | undefined) => void) => {
+		if (value === undefined) setValue(1);
 		else if (value < 8) setValue(value + 1);
 	}, []);
 
-	const decrementCount = useCallback((value: number | 'any', setValue: (v: number | 'any') => void) => {
-		if (value === 'any') return;
+	const decrementCount = useCallback((value: number | undefined, setValue: (v: number | undefined) => void) => {
+		if (value === undefined) return;
 		else if (value > 1) setValue(value - 1);
-		else setValue('any');
+		else setValue(undefined);
 	}, []);
 
 	const getActiveFilterCount = useCallback(() => {
 		let count = 0;
-		if (bedrooms !== 'any') count++;
-		if (bathrooms !== 'any') count++;
-		if (beds !== 'any') count++;
+		if (bedrooms !== undefined) count++;
+		if (bathrooms !== undefined) count++;
+		if (beds !== undefined) count++;
 		if (propertyTypes.length > 0) count++;
 		if (amenities.length > 0) count++;
 		if (features.length > 0) count++;
@@ -131,13 +135,14 @@ export default function FilterScreen() {
 	}, [amenities.length, bathrooms, beds, bedrooms, features.length, propertyTypes.length]);
 
 	const clearAll = useCallback(() => {
-		setBedrooms('any');
-		setBathrooms('any');
-		setBeds('any');
+		setBedrooms(undefined);
+		setBathrooms(undefined);
+		setBeds(undefined);
 		setPropertyTypes([]);
 		setAmenities([]);
 		setFeatures([]);
 		setPriceRange({min: 500, max: 5000});
+		clearFilter()
 	}, []);
 
 	const getPriceLabel = useCallback(() => {
@@ -150,6 +155,25 @@ export default function FilterScreen() {
 		if (price >= 1000) return `$${(price / 1000).toFixed(price % 1000 === 0 ? 0 : 1)}k`;
 		return `$${price}`;
 	}, []);
+
+	const searchWithFilter = () => {
+		setFilter('variables', {
+			bathrooms: bathrooms,
+			// bedrooms: bedrooms,
+			sale_status: listingType === 'purchase' ? 'sale' : 'rent',
+			beds: beds,
+			propertyType: propertyTypes,
+			maxPrice: priceRange.max,
+			minPrice: priceRange.min,
+			maxSize: undefined,
+			minSize: undefined,
+			checkIn: '',
+			checkOut: '',
+			// listingType: '',
+			amenities: amenities
+		})
+		navigation.goBack()
+	}
 
 	const propertyPrices = [
     800, 1200, 1500, 2000, 2500, 900, 1100, 1800, 2200, 2800,
@@ -194,7 +218,7 @@ export default function FilterScreen() {
 					<View style={[styles.section, {borderBottomColor: theme.colors.border}]}>
 						<View style={[styles.segment, {backgroundColor: theme.mode == 'light'? '#E5E7EB': theme.colors.background2}]}
 						>
-							{(['rental', 'purchase', 'hotels'] as ListingType[]).map(type => {
+							{(['rental', 'purchase', 'hotel'] as ListingType[]).map(type => {
 								const isActive = listingType === type;
 								return (
 									<TouchableOpacity key={type} style={[styles.segmentBtn, isActive && styles.segmentBtnActive, isActive && {backgroundColor: theme.colors.background}]} onPress={() => setListingType(type)}>
@@ -250,18 +274,18 @@ export default function FilterScreen() {
 					</View>
 					{/* Counters */}
 					<View style={[styles.section, {borderBottomColor: theme.colors.border}]}>
-						<ThemedText style={styles.label}>{listingType === 'hotels' ? 'Rooms & Bathrooms' : 'Bedrooms & Bathrooms'}</ThemedText>
+						<ThemedText style={styles.label}>{listingType === 'hotel' ? 'Rooms & Bathrooms' : 'Bedrooms & Bathrooms'}</ThemedText>
 
 						{/* Bedrooms/Rooms */}
 						<CounterRow
-							label={listingType === 'hotels' ? 'Rooms' : 'Bedrooms'}
+							label={listingType === 'hotel' ? 'Rooms' : 'Bedrooms'}
 							value={bedrooms}
 							onDecrement={() => decrementCount(bedrooms, setBedrooms)}
 							onIncrement={() => incrementCount(bedrooms, setBedrooms)}
 						/>
 
 						{/* Beds */}
-						{(listingType === 'rental' || listingType === 'hotels') && (
+						{(listingType === 'rental' || listingType === 'hotel') && (
 							<CounterRow
 								label="Beds"
 								value={beds}
@@ -390,7 +414,7 @@ export default function FilterScreen() {
     				<TouchableOpacity style={{}}>
 						<ThemedText style={styles.secondaryBtnText}>Save</ThemedText>
 					</TouchableOpacity>
-					<TouchableOpacity style={[styles.primaryBtn, {backgroundColor: theme.mode == 'dark'? theme.colors.background2: theme.colors.text}]}>
+					<TouchableOpacity onPress={() => searchWithFilter()} style={[styles.primaryBtn, {backgroundColor: theme.mode == 'dark'? theme.colors.background2: theme.colors.text}]}>
 						<ThemedText style={[styles.primaryBtnText, ]}>Show 247 places</ThemedText>
 					</TouchableOpacity>
 				</View>
@@ -439,8 +463,8 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
 }
 
 
-function CounterRow({ label, value, onDecrement, onIncrement }: { label: string; value: number | 'any'; onDecrement: () => void; onIncrement: () => void }) {
-	const isMin = value === 'any';
+function CounterRow({ label, value, onDecrement, onIncrement }: { label: string; value: number | undefined; onDecrement: () => void; onIncrement: () => void }) {
+	const isMin = value === undefined;
 	const isMax = value === 8;
 	const {theme} = useTheme()
 
@@ -451,7 +475,7 @@ function CounterRow({ label, value, onDecrement, onIncrement }: { label: string;
 				<TouchableOpacity onPress={onDecrement} disabled={isMin} style={[styles.counterBtn, {borderColor: theme.colors.border}, isMin && styles.counterBtnDisabled]}>
 					<ThemedText style={styles.counterBtnText}>−</ThemedText>
 				</TouchableOpacity>
-				<ThemedText style={styles.counterValue}>{value === 'any' ? 'Any' : value}</ThemedText>
+				<ThemedText style={styles.counterValue}>{value === undefined ? 'Any' : value}</ThemedText>
 				<TouchableOpacity onPress={onIncrement} disabled={isMax} style={[styles.counterBtn, {borderColor: theme.colors.border}, isMax && styles.counterBtnDisabled]}>
 					<ThemedText style={styles.counterBtnText}>+</ThemedText>
 				</TouchableOpacity>

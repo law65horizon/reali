@@ -4,12 +4,13 @@ import { useCallback, useMemo } from 'react';
 import { GET_ROOM_TYPE, SearchRoomTypes } from '../graphql/queries';
 
 interface SearchVariables {
-  propertyType?: string
+  propertyType?: string[]
   beds?: number;
-  bathrooms?: number;
+  // bathrooms?: number;
   minPrice?: number;
   maxPrice?: number;
   minsize?: number;
+  sale_status: string;
   maxSize?: number;
   amenities?: string[];
   address?: string;
@@ -26,16 +27,23 @@ interface SearchRoomTypesProps {
   pageSize: number;
   skip: boolean
   variables?: SearchVariables
+  query?: any
 }
 
 export const usesearchRoomTypes = ({
   pageSize = 20,
   skip = false,
-  variables
+  variables,
+  query
 }: SearchRoomTypesProps) => {
+  console.log({hook: variables})
+  const queryIdentifier = Object.keys(query)[0]
+  const value = Object.values(query)[0]
+  console.log({queryIdentifier, value, sale: query?.sale_status})
   const { data, loading, error, fetchMore: apolloFetchMore, refetch, networkStatus } = useQuery(SearchRoomTypes, {
     variables: {
-      input: {propertyType: 'apartment', first: pageSize},
+      input: {first: pageSize, query:queryIdentifier, value, ...variables,},
+      // input: {first: pageSize, query:queryIdentifier, value, sale_status: query?.sale_status??variables?.sale_status, ...variables,},
     },
     skip,
     notifyOnNetworkStatusChange: true,
@@ -58,18 +66,18 @@ export const usesearchRoomTypes = ({
     if (!hasMore || loading) return;
 
     const endCursor = data?.searchRoomTypes.pageInfo.endCursor;
+    console.log({endCursor})
 
     if (!endCursor) return;
 
     try {
       await apolloFetchMore({
         variables: {
-          first: pageSize,
-          after: endCursor,
-        },
+          input: { first: pageSize, after: endCursor, query: queryIdentifier, value },
+        }
       });
     } catch (err) {
-      console.error('Error fetching more properties:', err);
+      // console.error('Error fetching more properties:', err);
     }
   }, [hasMore, loading, data, apolloFetchMore]);
 

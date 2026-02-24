@@ -11,6 +11,8 @@ interface FavoritesStore {
   clearFavorites: () => void;
 }
 
+// const ADD_TO_WISHLISTS = 
+
 export const useFavoritesStore = create<FavoritesStore>()(
   persist(
     (set, get) => ({
@@ -22,6 +24,7 @@ export const useFavoritesStore = create<FavoritesStore>()(
           if (newFavorites.has(propertyId)) {
             newFavorites.delete(propertyId);
           } else {
+            // c
             newFavorites.add(propertyId);
           }
           return { favoriteIds: newFavorites };

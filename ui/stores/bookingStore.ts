@@ -197,3 +197,28 @@ export const useBookingsStore = create<BookingsState>()(
     }
   )
 );
+
+interface BookingFilter {
+  filter: {
+    query?: string // guest name, email, booking id, property name
+    status: string | undefined
+    // status: 'pending' | 'confirmed' | 'active' | 'cancelled' | 'completed' | undefined
+    startDate?: Date | undefined
+    endDate?: Date | undefined
+    guestType?: 'all' | 'repeated' | 'first_time'
+    minPrice?: number | undefined
+    maxPrice?: number | undefined
+  } | undefined
+
+  setFilter: (key: keyof Omit<BookingFilter, 'setFilter' | 'clearAll'>, value: BookingFilter[`${keyof Omit<BookingFilter, 'setFilter' | 'clearAll'>}`]) => void;
+  clearAll: () => void
+}
+
+export const useBookingFilter = create<BookingFilter>((set) => ({
+  filter: undefined,
+
+  clearAll: () => set({
+    filter: undefined
+  }),
+  setFilter: (key, value) => set(() => ({ [key]: value } as any)),
+}))

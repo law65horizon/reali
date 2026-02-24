@@ -1,4 +1,4 @@
-// SignUpScreen.js
+// SignInScreen.js
 import { ThemedText } from '@/components/ThemedText';
 import FormField from '@/components/ui/FormField';
 import { LOGIN, SEND_VERIFICATION_CODE, VERIFY_CODE } from '@/graphql/mutations';
@@ -67,6 +67,7 @@ export default function SignInScreen() {
     }
 
     try {
+      setIsSubmitting(true)
       const {data} = await login({
         variables: {
           email: form.email.toLocaleLowerCase().trim(),
@@ -80,6 +81,8 @@ export default function SignInScreen() {
       }
     } catch (error) {
       
+    } finally {
+      setIsSubmitting(false)
     }
   };
 
@@ -123,11 +126,14 @@ export default function SignInScreen() {
             },
           },
         });
+
+        console.log(data?.verifyCode)
   
         await setAuth(
           data.verifyCode.accessToken,
           data.verifyCode.refreshToken,
           data.verifyCode.user,
+          data.verifyCode.sessionId,
           data.verifyCode.user.role || 'guest'
         );
   
@@ -227,14 +233,18 @@ export default function SignInScreen() {
         
         <FormField 
           title='Email'
-          otherStyles={[
+          style={[
             styles.input ,
             touched && errors.email ? styles.errorBorder: null   
           ]}
           keyboardType='email-address'
           value={form.email}
-          handleChangeText={(text) => setForm({...form, email: text})}
+          onChangeText={(text) => setForm({...form, email: text})}
           onBlur={() => setTouched((t) => ({...t, email: true}))}
+          textContentType='username'
+          autoComplete='username'
+          autoCapitalize='none'
+          autoCorrect={false}
         />
         {touched.email && errors.email ? (
           <Text style={styles.errorText}>{errors.email}</Text>
@@ -244,17 +254,20 @@ export default function SignInScreen() {
         <FormField
           type='password' 
           title='Password'
-          otherStyles={[
+          style={[
             styles.input ,
             errors.email ? styles.errorBorder: null   
           ]}
           value={form.password}
-          handleChangeText={v => {
+          onChangeText={v => {
             setForm({...form, password: v});
             if (touched.email) setTouched(t => ({ ...t, email: true }));
           }}
           showPassword={showPassword}
           switchShowPassword={() => setShowPassword(!showPassword)}
+          autoComplete='password'
+          textContentType='password'
+          accessibilityLabel=''
         />
         
         {loginError && <Text style={[styles.errorText, {fontSize: 14}]}>{loginError.message}</Text>}
@@ -262,10 +275,10 @@ export default function SignInScreen() {
         <TouchableOpacity
             style={[styles.button, { backgroundColor: theme.colors.primary }]}
             onPress={onSubmit}
-            disabled={loginIn}
+            disabled={isSubmitting}
           >
-            {sendingCode ? (
-              <ActivityIndicator animating={loginIn}  color={theme.colors.buttonText ?? '#FFFFFF'} />
+            {isSubmitting ? (
+              <ActivityIndicator animating={isSubmitting}  color={theme.colors.buttonText ?? '#FFFFFF'} />
             ) : (
               <ThemedText type="defaultSemiBold" style={{ color: theme.colors.buttonText ?? '#FFFFFF' }}>
                 Agree and continue

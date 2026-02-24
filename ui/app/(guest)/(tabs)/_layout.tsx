@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useTheme } from '@/theme/theme';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { StyleSheet } from 'react-native';
 
 const MemoizedIconSymbol = React.memo(IconSymbol);
@@ -68,6 +68,19 @@ export default function TabLayout() {
             <MaterialCommunityIcons 
               size={focused ? 26 : 24} 
               name={focused ? 'bookmark' : 'bookmark-outline'} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="messages"
+        options={{
+          title: 'Messages',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              size={focused ? 26 : 24} 
+              name={focused ? 'chatbubbles' : 'chatbubbles-outline'} 
               color={color} 
             />
           ),

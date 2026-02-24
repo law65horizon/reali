@@ -2,51 +2,72 @@
 // stores/authStore.js (Zustand)
 
 import { LOGOUT } from '@/graphql/mutations';
-import { client } from '@/lib/apolloClient';
+import { client, setOnAuthStateUpdate } from '@/lib/apolloClient';
 import { setOnTokenRefreshFailed } from '@/lib/authUtils';
+import { gql } from '@apollo/client';
 import * as SecureStore from 'expo-secure-store';
+import { Alert } from 'react-native';
 import { create } from 'zustand';
 
-type mode = 'guest' | 'host'
+export type userMode = 'guest' | 'host'
+
+const GET_SESSION = gql`
+query GetSession($sessionId: String!) {
+  getSession(sessionId: $sessionId) {
+    Session {
+      deviceId
+      user {
+        id
+        email
+      }
+    }
+    message
+    success
+  }
+}
+`
 
 interface AuthStore {
     user: any;
+    sessionId: string;
     accessToken: any
     refreshToken: any
     isAuthenticated: boolean
     isLoading: boolean
-    mode: string
+    mode: userMode | null
     
-    setAuth: (accessToken: string, refreshToken: string, user: any, mode: mode) => void
+    setAuth: (accessToken: string, refreshToken: string, user: any, sessionId: string, mode: userMode) => void
+    logout: () => void;
     clearAuth: () => void
     loadAuth: () => void;
     updateUser: (user: any) => void
-    switchMode: (mode: mode) => void
-
+    switchMode: (mode: userMode) => void
 }
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
   user: null,
+  sessionId: '',
   accessToken: null,
   refreshToken: null,
   isAuthenticated: false,
   isLoading: true,
-  mode: 'guest',
+  mode: null,
 
   // Actions
-  setAuth: async (accessToken, refreshToken, user, mode) => {
+  setAuth: async (accessToken, refreshToken, user, sessionId, mode) => {
     // console.log({sid: "sosi"})
+    console.log({accessToken, refreshToken, user, mode, sessionId})
     // console.log({user: typeof mode})
     try {
       await SecureStore.setItemAsync('accessToken', accessToken);
       await SecureStore.setItemAsync('refreshToken', refreshToken);
       await SecureStore.setItemAsync('user', JSON.stringify(user));
+      await SecureStore.setItemAsync('sessionId', sessionId)
       await SecureStore.setItemAsync('mode', mode);
       
       set({ 
         user, 
         accessToken, 
-        refreshToken,
         isAuthenticated: true, 
         isLoading: false, 
         mode
@@ -58,7 +79,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   switchMode: async (mode) => {
     try {
-      await SecureStore.setItem('mode', mode)
+      await SecureStore.setItemAsync('mode', mode)
       console.log({mode})
       set({mode})
     } catch (error) {
@@ -66,15 +87,29 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
+  logout: async () => {
+    const sessionId = await SecureStore.getItemAsync('sessionId');
+    try {
+      await client.mutate({
+        mutation: LOGOUT,
+        variables: {sessionId}
+      })
+      get().clearAuth()
+    } catch (error:any) {
+      Alert.alert(error.message)
+    }
+  },
+
   clearAuth: async () => {
     try {
       await SecureStore.deleteItemAsync('accessToken');
       await SecureStore.deleteItemAsync('refreshToken');
+      await SecureStore.deleteItemAsync('session');
       await SecureStore.deleteItemAsync('user');
       await SecureStore.deleteItemAsync('mode');
       
       // Clear Apollo cache
-      await client.clearStore();
+      // await client.clearStore();
       
       set({ 
         user: null, 
@@ -82,7 +117,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         refreshToken: null,
         isAuthenticated: false, 
         isLoading: false,
-        mode:'guest'
+        mode:'guest',
+        sessionId: ''
       });
     } catch (error) {
       console.error('Failed to clear auth:', error);
@@ -91,30 +127,69 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   loadAuth: async () => {
     try {
-      // await SecureStore.setItemAsync('accessToken', '13713516525554b229be85d59eb14ac401d5d92377a6d6fda5bde911e04c481a4d92080491230fdd1588c91c3d2dd5b945a9069dbb056386f773e9ba761461c4');
-      const accessToken = await SecureStore.getItemAsync('accessToken');
-      const refreshToken = await SecureStore.getItemAsync('refreshToken');
-      const userStr = await SecureStore.getItemAsync('user');
-      const mode = await SecureStore.getItem('mode') || 'guest';
+      const [
+        accessToken,
+        refreshToken,
+        sessionId,
+        userRaw,
+        storedMode
+      ] = await Promise.all([
+        SecureStore.getItemAsync('accessToken'),
+        SecureStore.getItemAsync('refreshToken'),
+        SecureStore.getItemAsync('sessionId'),
+        SecureStore.getItemAsync('user'),
+        SecureStore.getItemAsync('mode'),
+      ])
+      console.log('ldoa')
+      const mode = (storedMode as userMode) ?? 'guest'
+  
+      if(!accessToken || !refreshToken || !userRaw) {
+        console.log('no access')
+        set({isLoading: false, mode: 'guest'})
+        return null
+      }
+      const user = JSON.parse(userRaw)
+  
+      try {
+        console.log('getting session')
+        const get_session = await client.query({
+          query: GET_SESSION,
+          variables: {sessionId}
+        })
+        console.log('session')
 
-      if (accessToken && refreshToken) {
-        const user = null;
-        // console.error("siosi")
-        // const user = JSON.parse(userStr);
-        set({ 
-          accessToken: '', 
-          refreshToken,
+        const sessionData = get_session.data?.getSession
+        // console.log({session: session.data.getSession})
+        // console.log({sessionData})
+
+        if (sessionData.success && sessionData.session.user) {
+          set({
+            user: sessionData.session.user,
+            accessToken,
+            refreshToken,
+            isAuthenticated: true,
+            mode,
+            isLoading: false
+          })
+        } else if (!sessionData.success && sessionData.message == 'session not found') {
+          get().clearAuth()
+          set({
+            isLoading: false, mode: 'guest'
+          })
+        }
+      } catch (error:any) {
+        set({
           user,
-          isAuthenticated: true, 
-          isLoading: false,
-          mode: mode
-        });
-      } else {
-        set({ isLoading: false });
+          accessToken,
+          refreshToken,
+          isAuthenticated: true,
+          mode,
+          isLoading: false
+        })
       }
     } catch (error) {
-      console.error('Failed to load auth:', error);
-      set({ isLoading: false });
+      console.error(error)
+      set({isLoading: false, mode: 'guest'})
     }
   },
 
@@ -127,25 +202,14 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  logout: async () => {
-    const { refreshToken } = get();
-    
-    // Call logout mutation if you want to invalidate refresh token on server
-    if (refreshToken) {
-      try {
-        await client.mutate({
-          mutation: LOGOUT,
-          variables: { refreshToken },
-        });
-      } catch (error) {
-        console.error('Server logout failed:', error);
-      }
-    }
-    
-    await get().clearAuth();
-  },
 }));
 
 setOnTokenRefreshFailed(async () => {
-  await useAuthStore.getState().clearAuth()
+  // await logout()
+  await useAuthStore.getState().clearAuth();
+})
+
+setOnAuthStateUpdate(async (authData) => {
+  const {accessToken, refreshToken, user, sessionId, mode } = authData;
+  useAuthStore.getState().setAuth(accessToken, refreshToken, user, sessionId, mode)
 })

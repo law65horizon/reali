@@ -8,6 +8,7 @@ export default function GuestLayout() {
   return (
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="chats" options={{ headerShown: false }} />
         {/* <Stack.Screen name="index" options={{ headerShown: true }} /> */}
         {/* <Stack.Screen name="+not-found" /> */}
         <Stack.Screen
@@ -34,6 +35,14 @@ export default function GuestLayout() {
         />
         <Stack.Screen
           name="(modals)/about/[about]"
+          options={{
+            presentation: 'modal',
+            animation: 'fade',
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="(modals)/review/[booking]"
           options={{
             presentation: 'modal',
             animation: 'fade',

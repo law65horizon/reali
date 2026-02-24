@@ -18,10 +18,19 @@ interface SearchFilters {
   features: string[];
 }
 
+// interface RecentSearch {
+//   query: string;
+//   timestamp: number;
+//   filters: SearchFilters;
+// }
+
 interface RecentSearch {
-  query: string;
+  tag: string;
   timestamp: number;
-  filters: SearchFilters;
+  postal_code?: number,
+  city?: string;
+  latitude?: number,
+  longitude?: number
 }
 
 interface SearchStore {
@@ -40,6 +49,7 @@ interface SearchStore {
   clearFilters: () => void;
   saveSearch: () => void;
   getActiveFilterCount: () => number;
+  addToRecents: (recent: RecentSearch) => void
 }
 
 const initialFilters: SearchFilters = {
@@ -78,17 +88,23 @@ export const useSearchStore = create<SearchStore>()(
         if (!query.trim()) return;
 
         const newSearch: RecentSearch = {
-          query,
+          tag: query,
           timestamp: Date.now(),
-          filters: { ...filters },
         };
 
         set({
           recentSearches: [
             newSearch,
-            ...recentSearches.filter((s) => s.query !== query),
-          ].slice(0, 10), // Keep last 10
+            ...recentSearches.filter((s) => s.tag !== query),
+          ].slice(0, 20), // Keep last 10
         });
+      },
+
+      addToRecents: (recent: RecentSearch) => {
+        const {recentSearches} = get()
+        set({
+          recentSearches: [recent, ...recentSearches.filter((s) => s.tag !== recent.tag)].slice(0, 20)
+        })
       },
 
       getActiveFilterCount: () => {

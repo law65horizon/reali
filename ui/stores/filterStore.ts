@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-interface FilterState {
+interface FilterState { 
   priceRange: { min: number; max: number };
   bedrooms: [number, number?];
   bathrooms: [number, number?];

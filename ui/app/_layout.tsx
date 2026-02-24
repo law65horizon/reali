@@ -1,6 +1,6 @@
 // import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { client } from '@/lib/apolloClient';
+import { client, setupPersist } from '@/lib/apolloClient';
 import { useAuthStore } from '@/stores/authStore';
 // import client from '@/lib/apolloClient';
 import { ThemeProvider } from '@/theme/theme';
@@ -8,7 +8,7 @@ import { ApolloProvider } from '@apollo/client';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 
@@ -36,19 +36,22 @@ export default function RootLayout() {
 
 
 function RootNavigator() {
+  const [loading, setLoading] = useState(true)
+  const {isAuthenticated, isLoading, mode, user, accessToken, loadAuth,} = useAuthStore()
 
   useEffect(() => {
     loadAuth()
+    setupPersist().then(() => (setLoading(false)))
   }, [])
 
-  const {isAuthenticated, isLoading, mode, loadAuth} = useAuthStore()
-  // console.warn({isAuthenticated, isLoading, accessToken})
+  if (loading) return null
+  console.warn({isAuthenticated, isLoading, mode, user,})
   return (
    <GestureHandlerRootView style={{flex:1}}>
     <ThemeProvider>
       <Stack >
         {/* <Home /> */}
-        <Stack.Protected guard={!isLoading && !isAuthenticated || mode === 'guest'}>
+        <Stack.Protected guard={(!isLoading && !isAuthenticated) || mode === 'guest'}>
           <Stack.Screen name='(guest)' options={{headerShown: false}}/> 
         </Stack.Protected>
         <Stack.Protected guard={mode === 'host'} >

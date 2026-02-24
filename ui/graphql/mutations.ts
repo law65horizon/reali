@@ -22,7 +22,6 @@ export const LOGIN = gql`
       message
       user {
         id
-        email
       }
     }
   }
@@ -46,15 +45,18 @@ export const VERIFY_CODE = gql`
       user {
         id
         email
-        name
       }
+      sessionId
     }
   }
 `;
 
 export const LOGOUT = gql`
-  mutation Logout($refreshToken: String!) {
-    logout(refreshToken: $refreshToken)
+  mutation Logout($sessionId: String!) {
+    logout(sessionId: $sessionId) {
+      message
+      success
+    }
   }
 `;
 

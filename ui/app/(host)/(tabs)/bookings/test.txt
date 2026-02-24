@@ -1,0 +1,50 @@
+// apollo/filterCache.ts
+import { makeVar, useReactiveVar } from '@apollo/client';
+import { FilterState } from '@/components/bookings/SearchFilterModal';
+
+const defaultFilters: FilterState = {
+  searchQuery: '',
+  propertyId: null,
+  status: [],
+  dateRange: { start: null, end: null },
+  sortBy: 'date',
+  sortOrder: 'desc',
+  priceRange: { min: 0, max: 10000 },
+  guestType: 'all',
+};
+
+// Reactive variable
+export const bookingsFiltersVar = makeVar<FilterState>(defaultFilters);
+
+// Hook to use filters
+export function useBookingsFilters() {
+  const filters = useReactiveVar(bookingsFiltersVar);
+  
+  return {
+    filters,
+    setFilters: (newFilters: FilterState) => bookingsFiltersVar(newFilters),
+    updateFilter: <K extends keyof FilterState>(key: K, value: FilterState[K]) => {
+      bookingsFiltersVar({ ...bookingsFiltersVar(), [key]: value });
+    },
+  };
+}
+
+// In Dashboard
+export default function BookingsDashboardScreen() {
+  const { setFilters } = useBookingsFilters();
+
+  const handleApplyFilters = (newFilters: FilterState) => {
+    setFilters(newFilters);
+  };
+
+  // ... rest
+}
+
+// In Tab Screen
+export default function UpcomingTabScreen() {
+  const { filters } = useBookingsFilters();
+
+  const { data } = useQuery(GET_BOOKINGS, {
+    variables: buildVariables(filters),
+  });
+}

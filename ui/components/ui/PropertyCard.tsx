@@ -15,7 +15,7 @@ interface PropertyCardProps {
 
 const {width} = Dimensions.get('screen')
 const PropertyCard = ({ property, width_ }: PropertyCardProps) => {
-  // console.log({property: property.property})
+  console.log({property: property.property.images})
   const { theme } = useTheme();
   const { toggleFavorite, isFavorite } = useFavoritesStore();
   
@@ -27,13 +27,13 @@ const PropertyCard = ({ property, width_ }: PropertyCardProps) => {
 
   // Memoize all derived values
   const propertyData = useMemo(() => {
-    const price = property?.basePrice ?? 0;
+    const price = property?.base_price ?? 0;
     const city = property?.property?.address?.city || 'Unknown';
     const country = property?.property?.address?.country || '';
     const type = (property?.property?.property_type || property?.type || 'Home') as string;
-    const beds = property?.bedCount ?? ((price % 3) + 2);
-    const baths = property?.bathroomCount ?? ((price % 2) + 1);
-    const sqft = property?.sizeSqft ?? (900 + (price % 5) * 120);
+    const beds = property?.bed_count ?? ((price % 3) + 2);
+    const baths = property?.bathroom_count ?? ((price % 2) + 1);
+    const sqft = property?.size_sqft ?? (900 + (price % 5) * 120);
     
     return { price, city, country, type, beds, baths, sqft };
   }, [property]);
@@ -49,7 +49,8 @@ const PropertyCard = ({ property, width_ }: PropertyCardProps) => {
 
   // Memoize images array
   const images = useMemo(
-    () => property?.images?.map((i: any) => i.url),
+    () => property?.property.images?.map((i: any) => i.cdn_url),
+    // () => property?.images?.map((i: any) => i.cdn_url),
     [property?.images]
   );
 

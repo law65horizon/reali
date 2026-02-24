@@ -21,11 +21,16 @@ export default function ListingLayout() {
   return (
     <Stack >
     {/* <Stack screenOptions={{presentation: 'fullScreenModal'}}> */}
-      <Stack.Screen name='index' options={{headerShown: false, }}/>
+      <Stack.Screen name='properties' options={{headerShown: false, }}/>
+      <Stack.Screen name='room_types' options={{headerShown: false, presentation: 'fullScreenModal' }}/>
+      <Stack.Screen name='units' options={{headerShown: false, presentation: 'fullScreenModal'}}/>
+      <Stack.Screen name='creU1' options={{headerShown: false, presentation: 'fullScreenModal'}}/>
+      <Stack.Screen name='creU2' options={{headerShown: false, presentation: 'fullScreenModal'}}/>
       <Stack.Screen name='start' options={{
         headerShown: false, presentation: 'modal', 
         contentStyle: {marginTop: 140, borderTopEndRadius: 30, borderTopStartRadius: 30, padding: 0,}
       }}/>
+       <Stack.Screen name='edit' options={{headerShown: false, presentation: 'fullScreenModal'}}/>
        <Stack.Screen name='homes' options={{headerShown: false, presentation:'fullScreenModal'}}/>
        <Stack.Screen name='services' options={{headerShown: false, presentation:'fullScreenModal'}}/>
        <Stack.Screen name='experiences' options={{headerShown: false, presentation: 'fullScreenModal'}}/>

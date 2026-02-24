@@ -1,24 +1,27 @@
 import { useTheme } from '@/theme/theme'
 import { Eye, EyeOff } from 'lucide-react-native'
 import React from 'react'
-import { KeyboardType, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, TextInput, TextInputProps, TouchableOpacity, View } from 'react-native'
 import { ThemedText } from '../ThemedText'
 
-interface FormPromps {
+interface FormPromps extends TextInputProps {
   title?: string
-  value: string
-  placeholder?: string
-  handleChangeText: (e:any) => void
-  otherStyles?: any,
-  onPress?: any
-  keyboardType?: KeyboardType
-  onBlur?: () => void
-  accessibilityLabel?: string
   type?: 'password'
   showPassword?: boolean,
   switchShowPassword?: () => void;
 }
-const FormField = ({title, value, placeholder, handleChangeText, otherStyles, onPress, keyboardType, onBlur, accessibilityLabel, type, showPassword, switchShowPassword} : FormPromps) => {
+const FormField = React.forwardRef<TextInput, FormPromps>(
+   (
+    {
+      title,
+      type = 'text',
+      showPassword,
+      switchShowPassword,
+      style,
+      ...props // 🔥 EVERYTHING ELSE (autofill, keyboardType, etc.)
+    },
+    ref
+  ) => {
   const { theme } = useTheme()
   
   return (
@@ -30,7 +33,7 @@ const FormField = ({title, value, placeholder, handleChangeText, otherStyles, on
             borderRadius: 8, backgroundColor: theme.colors.backgroundInput,
           }, ]}>
             <TextInput
-              onPress={onPress}
+              ref={ref}
               style={[
                 {
                   // paddingHorizontal: 12,
@@ -39,20 +42,13 @@ const FormField = ({title, value, placeholder, handleChangeText, otherStyles, on
                   // backgroundColor: theme.colors.backgroundSec,
                   color: theme.colors.text,
                   fontFamily: 'ROBOTO',
-                  borderWidth: 0
+                  borderWidth: 0,
                 },
-                otherStyles
+                style
               ]}
-              value={value}
-              placeholder={placeholder}
               placeholderTextColor={theme.colors.textSecondary}
-              onChangeText={handleChangeText }
-              keyboardType={keyboardType || "default"}
-              onBlur={onBlur}
-              accessibilityLabel={accessibilityLabel}
               secureTextEntry={type === 'password' && !showPassword}
-              textContentType={type === 'password' ? 'password': 'none'}
-              autoComplete={type === 'password' ? 'password': 'off'}
+              {...props}
             />
 
             {type === 'password' && (
@@ -65,6 +61,7 @@ const FormField = ({title, value, placeholder, handleChangeText, otherStyles, on
     </>
   )
 }
+)
 
 const styles = StyleSheet.create({
   nameField: { flex: 1, marginRight: 8 },

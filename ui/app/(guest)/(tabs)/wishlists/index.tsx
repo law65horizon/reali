@@ -1,17 +1,50 @@
 import DraggableModal from '@/components/DraggableModal'
 import { ThemedText } from '@/components/ThemedText'
 import { ThemedView } from '@/components/ThemedView'
-import Card from '@/components/ui/Card'
-import ImageCarousel from '@/components/ui/ImageCarousel'
 import { Line } from '@/components/ui/Line'
+import PropertyCard from '@/components/ui/PropertyCard'
+import { useFavoritesStore } from '@/stores'
 import { useTheme } from '@/theme/theme'
+import { gql, useQuery } from '@apollo/client'
 import { FontAwesome5, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import React, { useCallback, useState } from 'react'
-import { Dimensions, FlatList, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Dimensions, FlatList, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+
+const GET_ROOM_TYPES = gql`
+query GetRoomTypes($ids: [ID!]) {
+  getRoomTypes(ids: $ids) {
+    edges {
+      node {
+        amenities
+        name
+        id
+        images {
+          cdn_url
+          id
+        }
+        capacity
+        bed_count
+        bathroom_count
+        size_sqft
+        base_price
+        currency
+        property {
+            id
+            property_type
+            address_id
+            address {
+                city
+                country
+            }
+        }
+      }
+    }
+  }
+}
+`
 
 const { width, height } = Dimensions.get('screen');
-
 
 export default function Saved() {
      
@@ -20,60 +53,88 @@ export default function Saved() {
     const [type, setType] = useState<'properties' | 'experiences' | 'all'>('all');
     const [propertyType, setPropertyType] = useState<'rent' | 'sale' | 'sold' | 'all'>('rent');
     const [sort, setSort] = useState('')
-    
-    
-    const images = [
-        require('@/assets/images/image.png'),
-        require('@/assets/images/living-room.jpg'),
-        require('@/assets/images/image3.jpg'),
-        require('@/assets/images/image.png'),
-        require('@/assets/images/living-room.jpg'),
-        // require('@/assets/images/image3.jpg'),
-        // require('@/assets/images/image.png'),
-        // require('@/assets/images/living-room.jpg'),
-        // require('@/assets/images/image3.jpg'),
-        // Add more images up to 25
-        // ...require('@/assets/images/image4.jpg'), etc.
-    ]
+    const favoriteIds = useFavoritesStore(state => state.favoriteIds)
+    let ids: string[] = [];
+    favoriteIds.forEach(id => ids.push(id))
+    console.log({ids})
+    const {data, loading, error} = useQuery(GET_ROOM_TYPES, {
+        variables: {ids},
+        skip: ids.length <= 0
+    })
 
-    const renderItem = useCallback(
-          ({ item }: { item: any }) => (
-            <Card elevated style={[styles.propertyCard, {backgroundColor: theme.colors.backgroundSec}]}>
-                                {/* <ThemedText type='defaultSemiBold' style={styles.cardTitle}> {item?.title} </ThemedText> */}
-                                <ThemedText type='defaultSemiBold' style={styles.cardTitle}>Modern Apartment in City Center</ThemedText>
-                                
-                                <View style={styles.imageContainer}>
-                                  <ImageCarousel imageHeight={240} width={width-40} images={images} modal />
-                                </View>
+    console.log({error})
+
+    const roomTypes = data?.getRoomTypes.edges.map((edge:any) => edge.node) || []
+    console.log({roomTypes})
     
-                                {/* <Pressable onPress={() => router.push( item < 2 ? '/(guest)/(modals)/experienceDetail/[query]' : '/(guest)/(modals)/listing/[listing]' )} style={styles.cardContent}> */}
-                                <Pressable onPress={() => router.push({pathname: '/(guest)/(modals)/experienceDetail/[query]', params: {query: "2"}})} style={styles.cardContent}>
-                                    <View style={styles.propertyInfo}>
-                                        <ThemedText type='defaultSemiBold' style={styles.propertyTitle}>Room in {item?.address?.city|| 'USA'}</ThemedText>
-                                        <View style={styles.ratingContainer}>
-                                            <MaterialCommunityIcons name='star' color={theme.colors.warning} size={16}/>
-                                            <ThemedText type='body' style={styles.ratingText}>4.8 (6)</ThemedText>
-                                        </View>
-                                    </View>
+    
+    // const images = [
+    //     require('@/assets/images/image.png'),
+    //     require('@/assets/images/living-room.jpg'),
+    //     require('@/assets/images/image3.jpg'),
+    //     require('@/assets/images/image.png'),
+    //     require('@/assets/images/living-room.jpg'),
+    //     // require('@/assets/images/image3.jpg'),
+    //     // require('@/assets/images/image.png'),
+    //     // require('@/assets/images/living-room.jpg'),
+    //     // require('@/assets/images/image3.jpg'),
+    //     // Add more images up to 25
+    //     // ...require('@/assets/images/image4.jpg'), etc.
+    // ]
+
+    // const renderItem = useCallback(
+    //       ({ item }: { item: any }) => (
+    //         <Card elevated style={[styles.propertyCard, {backgroundColor: theme.colors.backgroundSec}]}>
+    //                             {/* <ThemedText type='defaultSemiBold' style={styles.cardTitle}> {item?.title} </ThemedText> */}
+    //                             <ThemedText type='defaultSemiBold' style={styles.cardTitle}>Modern Apartment in City Center</ThemedText>
+                                
+    //                             <View style={styles.imageContainer}>
+    //                               <ImageCarousel imageHeight={240} width={width-40} images={images} modal />
+    //                             </View>
+    
+    //                             {/* <Pressable onPress={() => router.push( item < 2 ? '/(guest)/(modals)/experienceDetail/[query]' : '/(guest)/(modals)/listing/[listing]' )} style={styles.cardContent}> */}
+    //                             <Pressable onPress={() => router.push({pathname: '/(guest)/(modals)/experienceDetail/[query]', params: {query: "2"}})} style={styles.cardContent}>
+    //                                 <View style={styles.propertyInfo}>
+    //                                     <ThemedText type='defaultSemiBold' style={styles.propertyTitle}>Room in {item?.address?.city|| 'USA'}</ThemedText>
+    //                                     <View style={styles.ratingContainer}>
+    //                                         <MaterialCommunityIcons name='star' color={theme.colors.warning} size={16}/>
+    //                                         <ThemedText type='body' style={styles.ratingText}>4.8 (6)</ThemedText>
+    //                                     </View>
+    //                                 </View>
                                     
-                                    <View style={styles.locationContainer}>
-                                        <MaterialCommunityIcons name='map-marker' color={theme.colors.textSecondary} size={16} />
-                                        {/* <ThemedText type="caption" secondary>Beach getaway in {item.address?.country}</ThemedText> */}
-                                        <ThemedText type="caption" secondary>Beach getaway in Ton Fug</ThemedText>
-                                    </View>
+    //                                 <View style={styles.locationContainer}>
+    //                                     <MaterialCommunityIcons name='map-marker' color={theme.colors.textSecondary} size={16} />
+    //                                     {/* <ThemedText type="caption" secondary>Beach getaway in {item.address?.country}</ThemedText> */}
+    //                                     <ThemedText type="caption" secondary>Beach getaway in Ton Fug</ThemedText>
+    //                                 </View>
                                     
-                                    <View style={styles.priceContainer}>
-                                        <ThemedText type='defaultSemiBold' style={styles.priceText}>${item?.price || 90} USD / night</ThemedText>
-                                    </View>
-                                </Pressable>
-                            </Card>
-          ), [theme]
-    )
+    //                                 <View style={styles.priceContainer}>
+    //                                     <ThemedText type='defaultSemiBold' style={styles.priceText}>${item?.price || 90} USD / night</ThemedText>
+    //                                 </View>
+    //                             </Pressable>
+    //                         </Card>
+    //       ), [theme]
+    // )
+
+     const renderItem = useCallback(
+    // console.log()
+    // ({ item }: any) => <PropertyCardSkeleton width_={width-20} />,
+        ({ item }: any) => <PropertyCard property={item} />,
+        []
+    );
+
+    const keyExtractor = useCallback((item: any) => item.id, []);
 
     const reset = () => {
         setType('all')
         setPropertyType('all')
         setSort('')
+    }
+
+    if (loading) {
+        return <View>
+            <ActivityIndicator size={'large'} />
+        </View>
     }
   return (
     <ThemedView style={{paddingTop: 60,}}>
@@ -161,9 +222,9 @@ export default function Saved() {
         {/* <ContactListItem  /> */}
 
         <FlatList
-            data={[1,2,3,4,5]}
+            data={roomTypes}
             renderItem={renderItem}
-            keyExtractor={(item) => item.toString()}
+            keyExtractor={keyExtractor}
             ListEmptyComponent={() => (
                 <View style={{marginTop: 40, gap:25}}>
                     <ThemedText type='defaultSemiBold'>

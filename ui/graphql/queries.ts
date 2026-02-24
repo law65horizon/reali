@@ -88,10 +88,10 @@ export const GET_ROOM_TYPE = gql`
       name
       description
       capacity
-      bedCount
-      bathroomCount
-      sizeSqft
-      basePrice
+      bed_count
+      bathroom_count
+      size_sqft
+      base_price
       currency
       amenities
       property {
@@ -116,6 +116,17 @@ export const GET_ROOM_TYPE = gql`
           created_at
         }
       }
+      avg_rating
+      totalReviews 
+      reviews {
+        comment
+        rating
+        created_at
+        user {
+          id
+          name
+        }
+      } 
     }
   }
 `
@@ -173,16 +184,14 @@ export const SearchRoomTypes = gql`
         edges {
             node {
                 id
-                bedCount
-                bathroomCount
-                sizeSqft
-                basePrice
+                bed_count
+                bathroom_count
+                size_sqft
+                base_price
                 availableUnits
                 images {
-                    id
-                    url
-                    meta_data
-                    caption
+                  id
+                  cdn_url
                 }
                 property {
                     id
@@ -197,6 +206,12 @@ export const SearchRoomTypes = gql`
                         city
                         postal_code
                         country
+                        latitude
+                        longitude
+                    }
+                    images {
+                      cdn_url
+                      id
                     }
                 }
             }
@@ -208,4 +223,211 @@ export const SearchRoomTypes = gql`
     }
 }
 `
+// graphql/messages.queries.ts
 
+export const CONVERSATIONS_QUERY = gql`
+  query Conversations($first: Int, $after: String, $filter: ConversationFilter) {
+    conversations(first: $first, after: $after, filter: $filter) {
+      edges {
+        node {
+          id
+          property {
+            id
+            title
+          }
+          host {
+            id
+            name 
+            email
+          }
+          guest {
+            id
+            name
+            email
+          }
+          booking {
+            id
+            check_in
+            check_out
+          }
+          last_message_at
+          unreadCount
+          lastMessage {
+            id
+            content
+            created_at
+            sender {
+              id
+              name
+            }
+          }
+        }
+        cursor
+      }
+      pageInfo {
+        hasNextPage
+        hasPreviousPage
+        startCursor
+        endCursor
+      }
+      totalCount
+    }
+  }
+`;
+
+export const CONVERSATION_QUERY = gql`
+  query Conversation($conversationId: ID, $recipient: ID, $limit: Int, $offset: Int) {
+    conversation(conversationId: $conversationId, recipient: $recipient) {
+      id
+      property {
+        id
+        title
+      }
+      host {
+        id
+        name
+        email
+      }
+      guest {
+        id
+        name
+        email
+      }
+      booking {
+        id
+        check_in
+        check_out
+        status
+      }
+      messages(limit: $limit, offset: $offset) {
+        id
+        content
+        created_at
+        read_at
+        message_type
+        sender {
+          id
+          name
+        }
+      }
+      last_message_at
+      unreadCount
+    }
+  }
+`;
+
+export const MESSAGES_QUERY = gql`
+  query Messages($conversationId: ID!, $limit: Int, $offset: Int) {
+    messages(conversationId: $conversationId, limit: $limit, offset: $offset) {
+      id
+      content
+      created_at
+      read_at
+      message_type
+      sender {
+        id
+        name
+      }
+    }
+  }
+`;
+
+export const TOTAL_UNREAD_COUNT_QUERY = gql`
+  query TotalUnreadCount {
+    totalUnreadCount
+  }
+`;
+
+export const SEND_MESSAGE_MUTATION = gql`
+  mutation SendMessage($input: MessageInput!) {
+    sendMessage(input: $input) {
+      id
+      content
+      created_at
+      read_at
+      message_type
+      sender {
+        id
+        name
+      }
+    }
+  }
+`;
+
+export const CREATE_CONVERSATION_MUTATION = gql`
+  mutation CreateConversation($input: CreateConversationInput!) {
+    createConversation(input: $input) {
+      id
+      property {
+        id
+        title
+      }
+      host {
+        id
+        name
+      }
+      guest {
+        id
+        name
+      }
+    }
+  }
+`;
+
+export const MARK_MESSAGES_AS_READ = gql`
+  mutation MarkMessagesAsRead($conversationId: ID!) {
+    markMessagesAsRead(conversationId: $conversationId)
+  }
+`;
+
+export const MARK_ALL_AS_READ = gql`
+  mutation MarkAllAsRead {
+    markAllAsRead
+  }
+`;
+
+export const MESSAGE_READ_SUBSCRIPTION = gql`
+  subscription MessageRead($conversationId: ID!) {
+    messageRead(conversationId: $conversationId) {
+      id
+      read_at
+    }
+  }
+`;
+
+export const MESSAGE_ADDED_SUBSCRIPTION = gql`
+  subscription MessageAdded($conversationId: ID!) {
+    messageAdded(conversationId: $conversationId) {
+      id
+      content
+      created_at
+      read_at
+      message_type
+      sender {
+        id
+        name
+      }
+    }
+  }
+`;
+
+export const CONVERSATION_UPDATED_SUBSCRIPTION = gql`
+  subscription ConversationUpdated($userId: ID!) {
+    conversationUpdated(userId: $userId) {
+      id
+      last_message_at
+      unreadCount
+      lastMessage {
+        id
+        content
+        created_at
+        sender {
+          id
+          name
+        }
+      }
+      guest {id name}
+      host {id name}
+    }
+  }
+`;
