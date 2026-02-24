@@ -42,11 +42,24 @@ type AuthPayload {
   accessToken: String!
   refreshToken: String!
   user: User!
+  sessionId: String!
 }
 
 type Query {
   me: User,
+  getSession(sessionId: String!): SessionResponse
   activeSessions: [Session]
+}
+
+type SessionResponse {
+  success: Boolean!
+  message: String!
+  Session: SessionData
+}
+
+type SessionData {
+  user: User,
+  deviceId: String!
 }
 
 input VerifyCodeInput {
@@ -61,7 +74,7 @@ type Mutation {
   sendVerificationCode(email: String!): SendCodeResponse!
   verifyCode(input: VerifyCodeInput!): AuthPayload!
   refreshAccessToken(refreshToken: String!): AuthPayload!
-  logout: Response!
+  logout(sessionId: String!): Response!
   logoutAllDevices: Response!
   updateProfile(fullName: String, phone: String): User!
   changePassword(currentPassword:String, newPassword: String): Response!

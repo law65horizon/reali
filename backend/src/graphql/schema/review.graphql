@@ -5,11 +5,11 @@ type Review {
   user: User!
   rating: Int!
   comment: String
-  createdAt: String!
+  created_at: String!
 }
 
 input ReviewInput {
-  propertyId: ID!
+  bookingId: ID!
   rating: Int!
   comment: String
 }

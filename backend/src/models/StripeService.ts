@@ -15,11 +15,25 @@ interface BookingDetails {
   check_in: string;
   check_out: string;
   total_price: number;
+  amount_paid: number;
   guest_count: number;
   currency: string;
   room_type_name?: string;
   property_title?: string;
   status: string;
+  installment_plan: number;
+}
+
+type Payment = {
+  id: number
+  booking_id: number
+  amount: number
+  currency: string
+  status: string
+  refunded_amount?: number
+  refunded_at?: string
+  created_at?: string
+  payment_method?: string
 }
 
 export class StripeService {
@@ -33,31 +47,30 @@ export class StripeService {
     bookingId: number,
     user: any,
     successUrl: string,
-    cancelUrl: string
-  ): Promise<{ clientSecret: string }> {
+    cancelUrl: string,
+    paymentOption: 'FULL' | 'PARTIAL',
+  ): Promise<{ clientSecret: string, booking: BookingDetails, payment: Payment }> {
+    console.time('model')
+    console.time('pool')
     const client = await this.pool.connect();
-    // let successUrl = 'exp://localhost:8081/--/payment-success?bookingId=${bookingId}`'
-    // let cancelUrl = 'exp://localhost:8081/--/payment-cancel?bookingId=${bookingId}`'
-    // let bookingId = 37;
-    // console.log({successUrl, cancelUrl})
+    console.timeEnd('pool')
     try {
         console.log({successUrl, user, bookingId})
+      console.time('booking')
       // Fetch booking details
       const bookingQuery = `
         SELECT 
-          b.id, b.unit_id, b.guest_id, b.check_in, b.check_out,
+          b.id, b.unit_id, b.guest_id, b.check_in, b.check_out, b.amount_paid,
           b.total_price, b.guest_count, b.currency, b.status,
           rt.name as room_type_name,
-          p.title as property_title
+          rt.installment_plan
         FROM bookings b
-        INNER JOIN room_units ru ON b.unit_id = ru.id
-        INNER JOIN room_types rt ON ru.room_type_id = rt.id
-        INNER JOIN properties p ON rt.property_id = p.id
+        INNER JOIN room_types rt ON b.room_type_id = rt.id
         WHERE b.id = $1 AND b.guest_id = $2;
       `;
       
-      const bookingResult = await client.query(bookingQuery, [bookingId, 2]);
-      
+      const bookingResult = await client.query(bookingQuery, [bookingId, user?.id]);
+      console.timeEnd('booking')
       if (bookingResult.rows.length === 0) {
         throw new Error('Booking not found or unauthorized');
       }
@@ -70,14 +83,16 @@ export class StripeService {
       }
 
       // Check if payment already exists
-      const existingPayment = await client.query(
-        `SELECT id, status FROM payments WHERE booking_id = $1 AND status != 'cancelled'`,
-        [bookingId]
-      );
+      // const existingPayment = await client.query(
+      //   `SELECT id, status FROM payments WHERE booking_id = $1 AND status != 'unpaid'`,
+      //   [bookingId]
+      // );
 
-      if (existingPayment.rows.length > 0 && existingPayment.rows[0].status === 'succeeded') {
-        throw new Error('Payment already completed for this booking');
-      }
+      
+
+      // if (existingPayment.rows.length > 0 && existingPayment.rows[0].status === 'succeeded') {
+      //   throw new Error('Payment already completed for this booking');
+      // }
 
       // Calculate line items
       const nights = Math.ceil(
@@ -85,41 +100,48 @@ export class StripeService {
         (1000 * 60 * 60 * 24)
       );
 
+      console.time('customer')
       const customer = await stripe.customers.create({
         name: user.name,
         email: user.email
       })
+      console.timeEnd('customer')
 
-      const customerSession = await stripe.customerSessions.create({
-        customer: customer.id,
-        components: {
-            mobile_payment_element: {
-                enabled: true,
-                features: {
-                    payment_method_save: 'enabled',
-                    payment_method_redisplay: 'enabled',
-                    payment_method_remove: 'enabled'
-                }
-            }
-        }
-      })
+      // const customerSession = await stripe.customerSessions.create({
+      //   customer: customer.id,
+      //   components: {
+      //       mobile_payment_element: {
+      //           enabled: true,
+      //           features: {
+      //               payment_method_save: 'enabled',
+      //               payment_method_redisplay: 'enabled',
+      //               payment_method_remove: 'enabled'
+      //           }
+      //       }
+      //   }
+      // })
 
+      const price = paymentOption == 'PARTIAL'? booking.total_price * (booking.installment_plan /100): booking.total_price
+      const amount_to_pay = Math.round((price-booking.amount_paid))
+      console.time('paymentIntent')
       const paymentIntent = await stripe.paymentIntents.create({
         // payment_method_types: ['card', 'amazon_pay'],
         customer: customer.id,
-        amount: Math.round(booking.total_price * 100), // Convert to cents
+        amount: amount_to_pay * 100, // Convert to cents
         currency: booking.currency.toLowerCase() || 'usd',
         setup_future_usage: 'off_session',
         metadata: {
-            booking_id: bookingId.toString(),
-            user_id: user.id.toString(),
-            check_in: booking.check_in,
-            check_out: booking.check_out,
+          booking_id: bookingId.toString(),
+          user_id: user.id.toString(),
+          check_in: booking.check_in,
+          check_out: booking.check_out,
         },
         automatic_payment_methods: {
-            enabled: true
+          enabled: true
         }
        });
+
+       console.timeEnd('paymentIntent')
 
         // Create Stripe checkout session
     //   const session = await stripe.checkout.sessions.create({
@@ -154,26 +176,28 @@ export class StripeService {
     //   });
 
       // Store payment record
-      await client.query(
-        `INSERT INTO payments (booking_id, stripe_checkout_session_id, stripe_payment_intent_id, amount, currency, status, metadata)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (stripe_checkout_session_id) DO UPDATE
-         SET updated_at = CURRENT_TIMESTAMP`,
+      console.time('pay')
+      const payment = await client.query(
+        `INSERT INTO payments (booking_id, amount, currency, status, stripe_checkout_session_id, stripe_payment_intent_id, payment_method)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
         [
           bookingId,
-          paymentIntent.id,
-          paymentIntent.id,
-          booking.total_price,
+          amount_to_pay,
           booking.currency,
-          'pending',
-          JSON.stringify({ session_url: 'customerSession.object' }),
+          'unpaid',
+          paymentIntent.id,
+          paymentIntent.id,
+          paymentIntent.payment_method
+          // JSON.stringify({ session_url: 'customerSession.object' }),
         ]
       );
+      console.timeEnd('pay')
       return {
-        clientSecret: paymentIntent.client_secret
+        clientSecret: paymentIntent.client_secret, booking, payment: payment.rows[0]
       };
     } catch (error) {
       console.error('Error creating checkout session:', error);
+      await client.query('ROLLBACK');
       throw error;
     } finally {
       client.release();
@@ -250,7 +274,7 @@ export class StripeService {
       const paymentResult = await client.query(
         `SELECT id, stripe_payment_intent_id, amount, status 
          FROM payments 
-         WHERE booking_id = $1 AND status = 'succeeded'
+         WHERE booking_id = $1 AND status = 'paid'
          ORDER BY created_at DESC
          LIMIT 1`,
         [bookingId]
@@ -320,7 +344,7 @@ export class StripeService {
 
     await client.query(
       `UPDATE payments 
-       SET stripe_payment_intent_id = $1, status = 'processing', updated_at = CURRENT_TIMESTAMP
+       SET stripe_payment_intent_id = $1, status = 'paid', updated_at = CURRENT_TIMESTAMP
        WHERE stripe_checkout_session_id = $2`,
       [session.payment_intent, session.id]
     );
@@ -339,12 +363,31 @@ export class StripeService {
     paymentIntent: Stripe.PaymentIntent,
     client: any
   ): Promise<void> {
-    await client.query(
-      `UPDATE payments 
-       SET status = 'succeeded', payment_method = $1, updated_at = CURRENT_TIMESTAMP
-       WHERE stripe_payment_intent_id = $2`,
-      [paymentIntent.payment_method, paymentIntent.id]
-    );
+    const bookingId = paymentIntent.metadata?.booking_id
+      try {
+        await client.query(
+        `UPDATE payments 
+         SET status = 'paid', payment_method = $1, updated_at = CURRENT_TIMESTAMP
+         WHERE stripe_payment_intent_id = $2`,
+        [paymentIntent.payment_method, paymentIntent.id]
+      );
+
+      console.log({soso: paymentIntent.amount})
+      
+
+      await client.query(
+        `UPDATE bookings 
+         SET status = CASE
+          WHEN status = 'pending' THEN 'confirmed'
+          ELSE status
+          END, 
+         amount_paid = COALESCE(amount_paid, 0) + $2, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1`,
+        [bookingId, paymentIntent.amount/100]
+      );
+    } catch (error) {
+      console.error(error)
+    }
   }
 
   private async handlePaymentFailed(

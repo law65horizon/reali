@@ -5,6 +5,7 @@ import bookingResolvers from './booking.js'
 import messageResolvers from './message.js'
 import reviewResolvers from './review.js'
 import authResolvers from './auth.js'
+import room_type from './room_type.js'
 import paymentResolvers from './payment.js'
 
 export default {
@@ -16,6 +17,7 @@ export default {
         ...messageResolvers.Query,
         ...reviewResolvers.Query,
         ...authResolvers.Query,
+        ...room_type.Query,
     },
     Mutation: {
         ...userResolvers.Mutation,
@@ -25,17 +27,20 @@ export default {
         ...messageResolvers.Mutation,
         ...reviewResolvers.Mutation,
         ...authResolvers.Mutation,
-        ...paymentResolvers.Mutation
+        ...paymentResolvers.Mutation,
+        ...room_type.Mutation,
     },
     Subscription: {
         ...messageResolvers.Subscription
     },
     Property: propertyResolvers.Property,
     Booking:  bookingResolvers.Booking,
+    Conversation: messageResolvers.Conversation,
     Message: messageResolvers.Message,
     Review: reviewResolvers.Review,
     Experience: experienceResolvers.Experience,
     RoomType: propertyResolvers.RoomType,
     Date: propertyResolvers.Date,
     DateTime: propertyResolvers.DateTime,
+    MyBookingResult: bookingResolvers.MyBookingResult,
 }

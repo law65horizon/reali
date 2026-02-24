@@ -1,0 +1,165 @@
+  # Enums
+  enum RoomUnitStatus {
+    active
+    maintenance
+    inactive
+  }
+
+  # Types
+  type RoomUnit {
+    id: ID!
+    room_type_id: ID!
+    unit_code: String!
+    status: RoomUnitStatus!
+    floor_number: Int!
+    created_at: String!
+    room_type: RoomType
+  }
+
+type RoomType {
+  id: ID!
+  property_id: ID!
+  name: String!
+  description: String
+  capacity: Int
+  bed_count: Int
+  bathroom_count: Int
+  size_sqft: Int
+  base_price: Float
+  weekly_rate: Float
+  monthly_rate: Float
+  currency: String
+  isActive: Boolean
+  amenities: [String]
+  units: [RoomUnit!]
+  pricing: [RateCalendarEntry!]
+  images: [Image!]
+  property: Property
+  availableUnits: Int
+  totalUnits: Int
+  totalReviews: Int
+  avg_rating: Float
+  reviews: [Review]
+  created_at: DateTime!
+  updated_at: DateTime!
+}
+
+  # Input Types
+  input CreateRoomTypeInput {
+    property_id: ID!
+    name: String!
+    description: String
+    capacity: Int
+    bed_count: Int
+    bathroom_count: Int
+    size_sqft: Int
+    base_price: Float!
+    weekly_rate: Float
+    monthly_rate: Float
+    currency: String
+    amenities: [String!]
+    min_nights: Int
+    max_nights: Int
+  }
+
+  input UpdateRoomTypeInput {
+    name: String
+    description: String
+    capacity: Int
+    bed_count: Int
+    bathroom_count: Int
+    size_sqft: Int
+    base_price: Float
+    weekly_rate: Float
+    monthly_rate: Float
+    currency: String
+    amenities: [String!]
+    min_nights: Int
+    max_nights: Int
+    is_active: Boolean
+  }
+
+  input CreateRoomUnitInput {
+    room_type_id: ID!
+    unit_code: String
+    status: RoomUnitStatus
+    # If unit_code not provided, will auto-generate
+    auto_generate_code: Boolean
+    floor_number: Int
+    # For batch creation
+    quantity: Int
+  }
+
+  input UpdateRoomUnitInput {
+    unit_code: String
+    status: RoomUnitStatus
+  }
+
+  input BatchCreateUnitsInput {
+    room_type_id: ID!
+    start_floor: Int!
+    end_floor: Int!
+    units_per_floor: Int!
+    # Optional: custom prefix (e.g., "A", "B")
+    prefix: String
+  }
+
+  # Response Types
+  type CreateRoomTypeResponse {
+    success: Boolean!
+    message: String
+    room_type: RoomType
+  }
+
+  type UpdateRoomTypeResponse {
+    success: Boolean!
+    message: String
+    room_type: RoomType
+  }
+
+  type DeleteRoomTypeResponse {
+    success: Boolean!
+    message: String
+  }
+
+  type CreateRoomUnitResponse {
+    success: Boolean!
+    message: String
+    unit: RoomUnit
+    units: [RoomUnit!] # For batch creation
+  }
+
+  type UpdateRoomUnitResponse {
+    success: Boolean!
+    message: String
+    unit: RoomUnit
+  }
+
+  type DeleteRoomUnitResponse {
+    success: Boolean!
+    message: String
+  }
+
+  type Query {
+    roomType(id: ID!): RoomType
+    roomUnit(id: ID!): RoomUnit
+    roomUnitsByRoomType(roomTypeId: ID!): [RoomUnit!]!
+    # Check if unit code is available
+    checkUnitCodeAvailability(roomTypeId: ID!, unitCode: String!): Boolean!
+    # Get suggested next unit code
+    suggestNextUnitCode(roomTypeId: ID!, floorNumber: Int): String!
+  }
+
+  type Mutation {
+    createRoomType(input: CreateRoomTypeInput!): CreateRoomTypeResponse!
+    updateRoomType(id: ID!, input: UpdateRoomTypeInput!): UpdateRoomTypeResponse!
+    deleteRoomType(id: ID!): DeleteRoomTypeResponse!
+    
+    # Room Unit CRUD
+    createRoomUnit(input: CreateRoomUnitInput!): CreateRoomUnitResponse!
+    updateRoomUnit(id: ID!, input: UpdateRoomUnitInput!): UpdateRoomUnitResponse!
+    deleteRoomUnit(id: ID!): DeleteRoomUnitResponse!
+    
+    # Batch operations
+    batchCreateUnits(input: BatchCreateUnitsInput!): CreateRoomUnitResponse!
+  }

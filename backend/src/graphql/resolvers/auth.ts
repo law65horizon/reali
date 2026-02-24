@@ -12,6 +12,7 @@ import SessionManager from "../../middleware/session.js";
 import { register } from "module";
 import redisClient from "../../config/redis.js";
 import message from "./message.js";
+import { GraphQLError } from "graphql";
 
 // const jwt = require('jsonwebtoken');
 // const crypto = require('crypto');
@@ -41,12 +42,12 @@ class OTPManager {
       await redisClient.expire(rateLimitKey, OTP_CONFIG.RATE_LIMIT_WINDOW);
     }
     
-    if (requestCount > OTP_CONFIG.MAX_REQUESTS_PER_HOUR) {
-      const ttl = parseInt((await redisClient.ttl(rateLimitKey))?.toString());
-      throw new Error(
-        `Too many requests. Please try again in ${Math.ceil(ttl / 60)} minutes.`
-      );
-    }
+    // if (requestCount > OTP_CONFIG.MAX_REQUESTS_PER_HOUR) {
+    //   const ttl = parseInt((await redisClient.ttl(rateLimitKey))?.toString());
+    //   throw new Error(
+    //     `Too many requests. Please try again in ${Math.ceil(ttl / 60)} minutes.`
+    //   );
+    // }
 
     // Generate 6-digit OTP
     const otp = crypto.randomInt(100000, 999999).toString();
@@ -121,7 +122,14 @@ class OTPManager {
 export default {
   Query: {
     me: async (_, __, { user, }) => {
-      if (!user) throw new Error('Not authenticated');
+      if (!user) {
+        throw new GraphQLError('Access token expired', {
+          extensions: {
+            code: 'UNAUTHENTICATED',
+            http: {status: 401 }
+          }
+        })
+      }
       
       const result = await pool.query(
         'SELECT * FROM users WHERE id = $1',
@@ -139,6 +147,31 @@ export default {
         // emailVerified: result.rows[0].email_verified,
         createdAt: result.rows[0].created_at,
       };
+    },
+
+    getSession: async(_, {sessionId}: {sessionId: string}, {user}: {user: User}) => {
+      if (!user) {
+        throw new GraphQLError('Access token expired', {
+          extensions: {
+            code: 'UNAUTHENTICATED',
+            http: {status: 401 }
+          }
+        })
+      }
+      const sessionData = await SessionManager.getSessionFromRedis(sessionId)
+      console.log({sessionData})
+      if (!sessionData) return null
+      return {
+        message: sessionData.message,
+        success: sessionData.success,
+        session: sessionData.session &&{
+          user: {
+            id: sessionData.session.userId,
+            email: sessionData.session.email
+          },
+          deviceId: sessionData.session.deviceId
+        }
+      }
     },
 
     // Get active sessions
@@ -208,7 +241,11 @@ export default {
         );
 
         if (existingUser.rows.length > 0) {
-          throw new Error('Email already registered')
+          return {
+            success: false,
+            message: 'Email already registered',
+            user: null,
+          }
         }
 
         const hashedPassword = await bcrypt.hash(input.password, 10);
@@ -244,31 +281,31 @@ export default {
 
         console.log({otp})
 
-        const info = await getEmailTransporter().sendMail({
-          from: '"Real Estate App" <noreply@realestate.com>',
-          to: email,
-          subject: 'Your Verification Code',
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #333;">Welcome to Real Estate App</h2>
-              <p style="font-size: 16px; color: #666;">Your verification code is:</p>
-              <div style="background-color: #f4f4f4; padding: 20px; text-align: center; border-radius: 8px;">
-                <h1 style="font-size: 48px; letter-spacing: 8px; margin: 0; color: #2563eb;">${otp}</h1>
-              </div>
-              <p style="font-size: 14px; color: #999; margin-top: 20px;">
-                This code expires in 10 minutes. If you didn't request this code, please ignore this email.
-              </p>
-            </div>
-          `,
-        });
+        // const info = await getEmailTransporter().sendMail({
+        //   from: '"Real Estate App" <noreply@realestate.com>',
+        //   to: email,
+        //   subject: 'Your Verification Code',
+        //   html: `
+        //     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        //       <h2 style="color: #333;">Welcome to Real Estate App</h2>
+        //       <p style="font-size: 16px; color: #666;">Your verification code is:</p>
+        //       <div style="background-color: #f4f4f4; padding: 20px; text-align: center; border-radius: 8px;">
+        //         <h1 style="font-size: 48px; letter-spacing: 8px; margin: 0; color: #2563eb;">${otp}</h1>
+        //       </div>
+        //       <p style="font-size: 14px; color: #999; margin-top: 20px;">
+        //         This code expires in 10 minutes. If you didn't request this code, please ignore this email.
+        //       </p>
+        //     </div>
+        //   `,
+        // });
 
         console.log("msos")
 
         // Log preview URL for development (Ethereal only)
-        const previewUrl = nodemailer.getTestMessageUrl(info);
-        if (previewUrl) {
-          console.log('📧 Preview Email:', previewUrl);
-        }
+        // const previewUrl = nodemailer.getTestMessageUrl(info);
+        // if (previewUrl) {
+        //   console.log('📧 Preview Email:', previewUrl);
+        // }
 
         const expiresIn = await OTPManager.getRemainingTime(email);
 
@@ -277,7 +314,8 @@ export default {
         return {
           success: true,
           message: 'Verification code sent to your email',
-          previewUrl: previewUrl || null,
+          // previewUrl: previewUrl || null,
+          previewUrl: null
         };
       } catch (error) {
         throw error
@@ -325,23 +363,22 @@ export default {
         }
     
         // Create session (hybrid JWT + Redis)
-        const { accessToken, refreshToken, sessionId } =
+        const { accessToken, refreshToken, sessionId, user: userData } =
           await SessionManager.createSession(user.id, {
             email: user.email,
             role: 'user',
             deviceId: req.headers['user-agent'],
           });
-    
+
+        console.log({userData})    
         return {
           accessToken,
           refreshToken,
           user: {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            phone: user.phone,
-            createdAt: user.created_at,
+            id: userData.id,
+            email: userData.email
           },
+          sessionId,
           isNewUser: userResult.rows.length === 0,
         };
       } catch (error) {
@@ -352,31 +389,47 @@ export default {
 
     refreshAccessToken: async (_, { refreshToken }) => {
       try {
+        console.log({refreshToken})
+        console.time('refresh')
         const tokens = await SessionManager.refreshAccessToken(refreshToken);
-
-        if(!tokens) {
-          throw new Error('Invalid or expired refresh')
+        console.timeEnd('refresh')
+        if(!tokens || !tokens.user) {
+          throw new GraphQLError('Invalid or expired token', {
+            extensions: {
+              code: 'SESSION_EXPIRED',
+              http: {status: 401}
+            }
+          })
         }
+
+        console.log({tokens: tokens.user})
 
         return {
           accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken
+          refreshToken: tokens.refreshToken,
+          user: tokens.user,
+          sessionId: tokens.sessionId
         }
       } catch (error) {
-        
+        throw error
       }
       
     },
 
-    logout: async (_: any, __: any, { user, sessionId, req }: any) => {
-      if (!user || !sessionId) {
-        throw new Error('Not authenticated');
+    logout: async (_: any, {sessionId}: {sessionId: string}, { user, req }: any) => {
+      if (!user) {
+        throw new GraphQLError('Access token expired', {
+          extensions: {
+            code: 'UNAUTHENTICATED',
+            http: {status: 401 }
+          }
+        })
       }
 
       try {
         const token = req.headers.authorization?.replace('Bearer ', '');
         await SessionManager.deleteSession(sessionId, token);
-
+        console.log('logged out successfully')
         return {
           success: true,
           message: 'Logged out successfully',
@@ -389,7 +442,12 @@ export default {
 
     logoutAllDevices: async (_: any, __: any, { user }: any) => {
       if (!user) {
-        throw new Error('Not authenticated');
+        throw new GraphQLError('Access token expired', {
+          extensions: {
+            code: 'UNAUTHENTICATED',
+            http: {status: 401 }
+          }
+        })
       }
 
       try {

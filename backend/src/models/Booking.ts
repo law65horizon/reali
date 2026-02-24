@@ -26,11 +26,24 @@ export interface BookingResult {
   errors: string[];
 }
 
+export interface SearchBookingInput {
+  query?: string // guest name, email, booking id, property name
+  startDate?: Date
+  endDate?: Date
+  status?: 'pending' | 'confirmed' | 'active'
+  guestType?: 'all' | 'repeated' | 'first_time'
+  minPrice?: number
+  maxPrice?: number
+}
+
 export interface BookingInput {
   guestId: number
   checkIn: Date
   checkOut: Date
   roomTypeId: number
+  guestCount: number, 
+  specialRequests?: string
+  source: string
 }
 
 
@@ -38,7 +51,7 @@ export interface BookingInput {
 export class BookingModel {
   constructor(private pool: Pool) {}
 
-  async calculateBookingPrice({roomTypeId, checkIn, checkOut}: Omit<BookingInput ,'guestId'>) {
+  async calculateBookingPrice({roomTypeId, checkIn, checkOut}: {roomTypeId: number, checkIn: Date, checkOut: Date}) {
     const nights = calculateNights(checkIn, checkOut);
     const useNightlyRates = nights < 7;
     
@@ -161,7 +174,8 @@ export class BookingModel {
 
     try {
       await client.query('BEGIN');
-      const { guestId, checkIn, checkOut, roomTypeId } = booking;
+      const { guestId, checkIn, checkOut, roomTypeId, guestCount, specialRequests, source } = booking;
+      console.log({roomTypeId})
 
       // Validate dates
       const nights = calculateNights(checkIn, checkOut);
@@ -170,28 +184,28 @@ export class BookingModel {
       }
 
       // Check minimum stay requirement
-      const minStayQuery = `
-        SELECT COALESCE(MIN(min_stay), 1) as min_stay
-        FROM rate_calendar
-        WHERE room_type_id = $1
-          AND date >= $2
-          AND date < $3
-      `;
-      const minStayResult = await client.query(minStayQuery, [
-        roomTypeId,
-        formatDate(checkIn),
-        formatDate(checkOut)
-      ]);
+      // const minStayQuery = `
+      //   SELECT COALESCE(MIN(min_stay), 1) as min_stay
+      //   FROM rate_calendar
+      //   WHERE room_type_id = $1
+      //     AND date >= $2
+      //     AND date < $3
+      // `;
+      // const minStayResult = await client.query(minStayQuery, [
+      //   roomTypeId,
+      //   formatDate(checkIn),
+      //   formatDate(checkOut)
+      // ]);
 
-      const minStay = minStayResult.rows[0]?.min_stay || 1;
-      if (nights < minStay) {
-        return {
-          success: false,
-          message: `Minimum stay of ${minStay} night(s) required`,
-          booking: null,
-          errors: [`Minimum stay requirement not met: ${minStay} nights`]
-        };
-      }
+      // const minStay = minStayResult.rows[0]?.min_stay || 1;
+      // if (nights < minStay) {
+      //   return {
+      //     success: false,
+      //     message: `Minimum stay of ${minStay} night(s) required`,
+      //     booking: null,
+      //     errors: [`Minimum stay requirement not met: ${minStay} nights`]
+      //   };
+      // }
 
       // Check if dates are blocked
       const blockedQuery = `
@@ -250,26 +264,27 @@ export class BookingModel {
 
       console.log({ososo: 'idsos'})
       const priceCalc = await this.calculateBookingPrice({roomTypeId, checkIn, checkOut})
-
-      console.log({priceCalc})
       const bookingQuery = `
         INSERT INTO bookings (
-          unit_id, guest_id, check_in, check_out,
-          total_price, currency, status, source
+          unit_id, room_type_id, guest_id, check_in, check_out,
+          total_price, currency, status, source, guest_count, special_requests
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING *
       `;
 
       const bookingResult = await client.query(bookingQuery, [
         unitId,
+        roomTypeId,
         guestId,
         formatDate(checkIn),
         formatDate(checkOut),
         priceCalc.total,
         priceCalc.currency,
-        'confirmed',
-        'mobile app'
+        'pending',
+        source,
+        guestCount,
+        specialRequests
       ])
 
       await client.query('COMMIT')
@@ -288,33 +303,248 @@ export class BookingModel {
     }    
   }
 
-  async myBookings({userId, status}: {userId: string, status: string}): Promise<Booking[]> {
-    let query = 'SELECT * FROM bookings WHERE guest_id = $1';
+  async myBookings({userId, status}: {userId: number, status: string}): Promise<any[]> {
+    let query = `
+      SELECT b.*, rt.name AS room_name, rt.id AS room_id, p.id AS property_id, p.title, p.property_type, p.address_id, p.realtor_id from bookings b
+      INNER JOIN room_types rt ON rt.id = b.room_type_id
+      INNER JOIN properties p ON p.id = rt.property_id
+      WHERE b.guest_id = $1
+    `;
     const params: any[] = [userId];
 
     if (status) {
-      query += ' AND status = $2';
+      query += ' AND b.status = $2';
       params.push(status.toLowerCase());
     }
 
-    query += ' ORDER BY created_at DESC';
+    query += ' ORDER BY check_in DESC';
+
+    console.log({query, params})
 
     const result = await pool.query(query, params);
-    return result.rows;
+    console.log({result: result.rows})
+    const bookings = result.rows.map((booking) => ({
+      id: booking.id,
+      room_type_id: booking.room_type_id,
+      unit_id: booking.unit_id,
+      checkIn: booking.check_in,
+      checkOut: booking.check_out,
+      totalPrice: booking.total_price,
+      amountPaid: booking.amount_paid,
+      currency: booking.currency,
+      specialRequests: booking.special_requests,
+      type: booking.property_type,
+      guest_id: booking.guest_id,
+      guestCount: booking.guest_count,
+      source: booking.source,
+      status: booking.status,
+      payment_status: booking.payment_status,
+      created_at: booking.created_at,
+      updated_at: booking.updated_at,
+      property: {
+        id: booking.property_id,
+        address_id: booking.address_id,
+        realtor_id: booking.realtor_id,
+        title: booking.title
+      },
+      room_type: {
+        id: booking.room_id,
+        name: booking.room_name
+      }
+    }))
+    return bookings;
   }
 
-  async findById(id: number): Promise<Booking | null> {
-    console.log({id})
-    const query = `SELECT * FROM bookings WHERE id = $1`;
+  async realtorBookings({userId, input}: {userId: number, input: SearchBookingInput}): Promise<any[]> {
+    const {
+      query: search,
+      startDate,
+      endDate,
+      status,
+      minPrice,
+      maxPrice, 
+      guestType
+    } = input
+    // let query = `
+    //   SELECT b.*, rt.name AS room_name, rt.id AS room_id, rt.base_price AS room_base_price, p.id AS property_id, p.title, p.property_type, p.address_id, p.realtor_id from bookings b
+    //   INNER JOIN room_types rt ON rt.id = b.room_type_id
+    //   INNER JOIN properties p ON p.id = rt.property_id
+    //   WHERE p.realtor_id = $1
+    // `;
+
+    console.time('search')
+    console.log({input})
+    let query = `
+      SELECT 
+        b.*,
+        rt.name AS room_name,
+        rt.id AS room_id,
+        rt.base_price AS room_base_price,
+        p.id AS property_id,
+        p.title AS property_title,
+        p.property_type,
+        p.address_id,
+        p.realtor_id,
+        u.name AS guest_name,
+        u.email AS guest_email
+      FROM bookings b
+      INNER JOIN room_types rt ON rt.id = b.room_type_id
+      INNER JOIN properties p ON p.id = rt.property_id
+      INNER JOIN users u ON u.id = b.guest_id
+      WHERE p.realtor_id = $1
+    `;
+
+    const params: any[] = [1];
+    let idx = params.length + 1;
+    // const params: any[] = [1];
+
+    if (search) {
+      query += `
+        AND (
+          u.name ILIKE $${idx}
+          OR u.email ILIKE $${idx}
+          OR p.title ILIKE $${idx}
+          OR CAST(b.id AS TEXT) = $${idx + 1}
+        )
+      `;
+      params.push(`%${search}%`, search);
+      idx += 2;
+    }
+
+    if (startDate) {
+      query += ` AND b.check_in >= $${idx}`;
+      params.push(startDate);
+      idx++;
+    }
+
+    if (endDate) {
+      query += ` AND b.check_out <= $${idx}`;
+      params.push(endDate);
+      idx++;
+    }
+
+    if (status) {
+      query += ` AND b.status = $${idx}`;
+      params.push(status);
+      idx++;
+    }
+
+    if (minPrice) {
+      query += ` AND b.total_price >= $${idx}`;
+      params.push(minPrice);
+      idx++;
+    }
+
+    if (maxPrice) {
+      query += ` AND b.total_price <= $${idx}`;
+      params.push(maxPrice);
+      idx++;
+    }
+
+    if (guestType === 'repeated') {
+      query += `
+        AND b.guest_id IN (
+          SELECT guest_id
+          FROM bookings
+          GROUP BY guest_id
+          HAVING COUNT(*) > 1
+        )
+      `
+    }
+
+    if (guestType === 'first_time') {
+      query += `
+        AND b.guest_id IN (
+          SELECT guest_id
+          FROM bookings
+          GROUP BY guest_id
+          HAVING COUNT(*) = 1
+        )
+      `
+    }
+
+
+
+    query += ' ORDER BY check_in DESC';
+
+    console.log({query, params})
+
+    const result = await pool.query(query, params);
+    // console.log({result: result.rows})
+    const bookings = result.rows.map((booking) => ({
+      id: booking.id,
+      room_type_id: booking.room_type_id,
+      unit_id: booking.unit_id,
+      checkIn: booking.check_in,
+      checkOut: booking.check_out,
+      totalPrice: booking.total_price,
+      amountPaid: booking.amount_paid,
+      currency: booking.currency,
+      specialRequests: booking.special_requests,
+      type: booking.property_type,
+      guest_id: booking.guest_id,
+      guestCount: booking.guest_count,
+      source: booking.source,
+      status: booking.status,
+      payment_status: booking.payment_status,
+      created_at: booking.created_at,
+      updated_at: booking.updated_at,
+      property: {
+        id: booking.property_id,
+        address_id: booking.address_id,
+        realtor_id: booking.realtor_id,
+        title: booking.title
+      },
+      room_type: {
+        id: booking.room_id,
+        name: booking.room_name
+      }
+    }))
+    console.timeEnd('search')
+    return bookings;
+  }
+
+  async findById(id: number): Promise<any | null> {
+    const query = `
+      SELECT b.*, rt.name AS room_name, rt.id AS room_id, rt.base_price AS room_base_price, p.id AS property_id, p.title, p.property_type, p.address_id, p.realtor_id from bookings b
+      INNER JOIN room_types rt ON rt.id = b.room_type_id
+      INNER JOIN properties p ON p.id = rt.property_id
+      WHERE b.id = $1
+    `;
     const result = await this.pool.query(query, [id]);
+    const booking = result.rows[0]
     // console.log({result})
-    return result.rows[0] || null;
-  }
-
-  async findAll(): Promise<Booking[]> {
-    const query = `SELECT * FROM bookings`;
-    const result = await this.pool.query(query);
-    return result.rows;
+    const booking_property = {
+      id: booking.id,
+      unit_id: booking.unit_id,
+      checkIn: booking.check_in,
+      checkOut: booking.check_out,
+      totalPrice: booking.total_price,
+      amountPaid: booking.amount_paid,
+      currency: booking.currency,
+      specialRequests: booking.special_requests,
+      type: booking.property_type,
+      guest_id: booking.guest_id,
+      guestCount: booking.guest_count,
+      source: booking.source,
+      status: booking.status,
+      payment_status: booking.payment_status,
+      created_at: booking.created_at,
+      updated_at: booking.updated_at,
+      property: {
+        id: booking.property_id,
+        address_id: booking.address_id,
+        realtor_id: booking.realtor_id,
+        title: booking.title,
+        property_type: booking.property_type
+      },
+      room_type: {
+        id: booking.room_id,
+        name: booking.room_name,
+        base_price: booking.room_base_price
+      }
+    }
+    return booking_property || null;
   }
 
   async update(id: number, updates: Partial<Booking>): Promise<Booking | null> {

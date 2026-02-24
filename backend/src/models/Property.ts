@@ -3,10 +3,22 @@ import { Pool, PoolClient } from "pg";
 import pool from "../config/database.js";
 import redisClient from "../config/redis.js";
 import { Address } from "./Address.js";
+import cloudinary from "../config/cloudinary.js";
+import {deleteFromCloudinary} from '../utils/deleteFromCloudinary.js'
+// import {UserIn} from '@apollo/server'
 
 // ============================================
 // TYPES & INTERFACES
 // ============================================
+
+export type Recents ={
+  userId: number;
+  tag: string;
+  postal_code?: number,
+  city?: string;
+  latitude?: number,
+  longitude?: number
+}
 
 export type Unit = {
   id: number;
@@ -23,7 +35,7 @@ export type RateCalendar = {
   is_blocked: boolean;
 };
 
-interface RoomType {
+export interface RoomType {
   id: number;
   property_id: number;
   name: string;
@@ -32,8 +44,8 @@ interface RoomType {
   bed_count?: number;
   bathroom_count?: number;
   size_sqft?: number;
-  basePrice?: number;
-  derivedPrice?: number;
+  base_price?: number;
+  derived_price?: number;
   currency?: string;
   is_active?: boolean;
   amenities?: string[];
@@ -48,6 +60,8 @@ interface RoomType {
   duration?: string;
   monthlyRate?: number;
   weeklyRate?: number;
+  totalReviews?: number;
+  avg_rating?: number
 }
 
 interface PricingRule {
@@ -80,11 +94,30 @@ export interface Property {
   updated_at?: string;
   address?: Address;
   roomTypes: RoomType[];
-  images?: { id: number; url: string; meta_data?: string; caption?: string }[];
+  images?: ImagesInput[];
+}
+
+export interface PropertyEdit {
+  id: number;
+  realtor_id: number;
+  address_id: number;
+  title: string;
+  speciality: string;
+  amenities: string[];
+  price: number;
+  description?: string;
+  property_type: "apartment" | "hotel" | "house";
+  sale_status: "rent" | "sale";
+  status: "draft" | "published" | "pending_review" | "archived";
+  created_at?: string;
+  updated_at?: string;
+  address?: Address;
+  images?: ImageManageMentInput;
 }
 
 export interface SearchRoomsInput {
-  propertyType?: string;
+  propertyType?: string[];
+  sale_status?: 'rent' | 'sale'
   beds?: number;
   bathrooms?: number;
   minPrice?: number;
@@ -92,7 +125,8 @@ export interface SearchRoomsInput {
   minSize?: number;
   maxSize?: number;
   amenities?: string[];
-  address?: string;
+  query?: string;
+  value?: string;
   checkIn?: Date;
   checkOut?: Date;
   first?: number;
@@ -100,6 +134,22 @@ export interface SearchRoomsInput {
   latitude?: number;
   longitude?: number;
   radius?: number;
+}
+
+export interface ImagesInput {
+  storage_key: string
+  uri: string
+  fileName: string
+  mimeType: string
+  width?: number
+  height?: number
+  fileSize: number
+}
+
+export interface ImageManageMentInput {
+  add: ImagesInput[],
+  remove: string[]
+  update: any[]
 }
 
 // ============================================
@@ -145,7 +195,7 @@ export class PropertyModel {
       speciality: "speciality",
       amenities: "amenities",
       price: "price",
-      basePrice: "base_price",
+      base_price: "base_price",
       description: "description",
       status: "status",
       created_at: "created_at",
@@ -154,9 +204,9 @@ export class PropertyModel {
       sale_status: "sale_status",
       property_id: "property_id",
       name: "name",
-      bedCount: "bed_count",
-      bathroomCount: "bathroom_count",
-      sizeSqft: "size_sqft",
+      bed_count: "bed_count",
+      bathroom_count: "bathroom_count",
+      size_sqft: "size_sqft",
       capacity: "capacity",
       currency: "currency",
       isActive: "is_active",
@@ -222,7 +272,7 @@ export class PropertyModel {
       `INSERT INTO addresses (street, city_id, postal_code, geom)
        VALUES ($1, $2, $3, ST_SetSrid(ST_MakePoint($4, $5), 4326)::geography)
        ON CONFLICT (street, city_id, postal_code) DO UPDATE 
-       SET geom = ST_SetSrid(ST_MakePoint($4, $5), 4326)::geography)
+       SET geom = ST_SetSrid(ST_MakePoint($4, $5), 4326)::geography
        RETURNING id`,
       [
         address.street,
@@ -302,6 +352,155 @@ export class PropertyModel {
     return "daily";
   }
 
+  private parseAddressQuery(query: string): {
+    useFullText: boolean;
+    usePostalCode: boolean;
+    useCity: boolean;
+    normalizedQuery: string;
+  } {
+    const trimmed = query.trim();
+    
+    // Check if it's primarily numeric (likely postal code)
+    const digitsOnly = trimmed.replace(/[^0-9]/g, '');
+    const usePostalCode = digitsOnly.length >= 5;
+    
+    // Check if it's a short query (likely city/state)
+    const useCity = trimmed.split(/\s+/).length <= 2 && !usePostalCode;
+    
+    // Otherwise use full-text search
+    const useFullText = !usePostalCode && !useCity;
+    
+    return {
+      useFullText,
+      usePostalCode,
+      useCity,
+      normalizedQuery: trimmed.toLowerCase()
+    };
+  }
+
+  private buildAddressFilter(
+    query?: string,
+    latitude?: number,
+    longitude?: number,
+    radius?: number
+  ): string {
+    if(latitude && longitude && radius) {
+      return `
+        SELECT a.id, a.street, a.postal_code, a.geom, c.name as city_name, co.name as country_name
+        FROM addresses a
+        INNER JOIN cities c ON a.city_id = c.id
+        INNER JOIN countries co ON c.country_id = co.id
+        WHERE ST_DWITHIN(
+          a.geom, ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography,
+          ${radius}
+        )
+      `
+    }
+
+    if (query) {
+      const parsed = this.parseAddressQuery(query)
+
+      if (parsed.usePostalCode) {
+        const normalized = query.replace(/[^0-9]/g, '');
+        return `
+          SELECT a.id, a.street, a.postal_code, a.geom, c.name as city_name, c.id as city_id, co.name as country_name, c.id as city_id
+          FROM addresses a
+          INNER JOIN cities c ON a.city_id = c.id
+          INNER JOIN countries co ON c.country_id = co.id
+          WHERE a.postal_code ILIKE '%${normalized}%'
+        `
+      }
+
+      if(parsed.useCity) {
+        return `
+          SELECT a.id, a.street, a.postal_code, a.geom, c.name as city_name, c.id as city_id, co.name as country_name, c.id as city_id
+          FROM addresses a
+          INNER JOIN cities c ON a.city_id = c.id
+          INNER JOIN countries co ON c.country_id = co.id
+          WHERE c.name ILIKE '%${parsed.normalizedQuery}%'
+        `
+      }
+
+      return `
+        SELECT a.id, a.street, a.postal_code, a.geom, c.name as city_name, c.id as city_id, co.name as country_name, c.id as city_id
+        FROM addresses a
+        INNER JOIN cities c ON a.city_id = c.id
+        INNER JOIN countries co ON c.country_id = co.id
+        WHERE a.search_vector @@ plainto_tsquery('english', '${query}')
+      `
+    }
+  }
+
+  private buildAddressFilter1(
+    query?: string,
+    latitude?: number,
+    longitude?: number,
+    radius?: number
+  ): string {
+    if(latitude && longitude && radius) {
+      return `
+        SELECT a.id, a.street, a.postal_code, a.geom, c.name as city_name, co.name as country_name, co.id as country_id
+        FROM addresses a
+        INNER JOIN cities c ON a.city_id = c.id
+        INNER JOIN countries co ON c.country_id = co.id
+        WHERE ST_DWITHIN(
+          a.geom, ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography,
+          ${radius}
+        )
+      `
+    }
+
+    if (query) {
+      const parsed = this.parseAddressQuery(query)
+
+      if (parsed.usePostalCode) {
+        const normalized = query.replace(/[^0-9]/g, '');
+        return `
+          SELECT a.id, a.street, a.postal_code, a.geom, c.name as city_name, c.id as city_id, co.name as country_name, co.id as country_id
+          FROM addresses a
+          INNER JOIN cities c ON a.city_id = c.id
+          INNER JOIN countries co ON c.country_id = co.id
+          WHERE a.postal_code ILIKE '%${normalized}%'
+        `
+      }
+
+      if(parsed.useCity) {
+        return `
+          SELECT c.id as city_id, c.name as city_name, co.name as country_name, co.id as country_id
+          FROM cities c
+          INNER JOIN countries co ON c.country_id = co.id
+          where c.name ILIKE '%${parsed.normalizedQuery}%'
+        `
+      }
+
+      return `
+        SELECT a.id, a.street, a.postal_code, a.geom, c.name as city_name, c.id as city_id, co.name as country_name, co.id as country_id
+        FROM addresses a
+        INNER JOIN cities c ON a.city_id = c.id
+        INNER JOIN countries co ON c.country_id = co.id
+        WHERE a.search_vector @@ plainto_tsquery('english', '${query}')
+      `
+    }
+  }
+
+  private buildAvailabilityFilter (
+    checkIn: Date,
+    checkOut: Date,
+  ): string {
+    return `
+      SELECT 1 FROM room_units u
+      WHERE u.room_type_id = rt.id
+        AND u.status = 'active'
+        AND NOT EXISTS (
+          SELECT 1 FROM bookings b
+          WHERE b.unit_id = u.id
+          AND b.status IN ('pending', 'confirmed')
+          AND daterange(b.check_in, b.check_out, '[)')
+            && daterange(DATE '${checkIn}', DATE '${checkOut}','[)')
+        )
+    `
+  }
+
   // ============================================
   // CREATE PROPERTY
   // ============================================
@@ -309,9 +508,29 @@ export class PropertyModel {
   async create(
     property: Omit<Property, "id" | "created_at" | "updated_at"> & {
       address: Omit<Address, "id" | "created_at">;
-      image_urls: string[];
+      images: ImagesInput[];
     }
   ): Promise<Property> {
+    if (property.title.trim().length < 3) {
+      throw new Error('Property title must be at least 3 characters');
+    }
+
+    if (!property.description || property.description.trim().length < 50) {
+      throw new Error('Property description must be at least 50 characters');
+    }
+
+    if (!property.price || property.price <= 0) {
+      throw new Error('Price must be greater than 0');
+    }
+
+    if (!property.images || property.images.length === 0) {
+      throw new Error('At least one image is required');
+    }
+
+    if (!property.address || !property.address.street || !property.address.city || !property.address.country) {
+      throw new Error('Complete address information is required');
+    }
+    
     const client = await this.pool.connect();
 
     try {
@@ -323,7 +542,9 @@ export class PropertyModel {
       }
 
       // Get or create address
+      console.log({wo: 'working'})
       const addressId = await this.getOrCreateAddress(client, property.address);
+      console.log({addressId})
 
       // Insert property
       const propertyResult = await client.query(
@@ -340,104 +561,47 @@ export class PropertyModel {
           property.price || null,
           property.description || null,
           JSON.stringify(property.amenities || []),
-          property.status || "draft",
-          property.property_type,
+          property.status.toLocaleLowerCase() || "draft",
+          property.property_type.toLocaleLowerCase(),
           property.sale_status || "rent",
         ]
       );
 
       const newProperty = propertyResult.rows[0];
+      console.log({pr: newProperty.id})
 
       // Insert images
       const images = [];
-      if (property.image_urls && property.image_urls.length > 0) {
-        for (const imageUrl of property.image_urls) {
+      if (property.images && property.images.length > 0) {
+        for (const imageUrl of property.images) {
           const imageResult = await client.query(
-            `INSERT INTO property_images (property_id, url)
-             VALUES ($1, $2)
-             RETURNING id, url, meta_data, caption`,
-            [newProperty.id, imageUrl]
+            `INSERT INTO images 
+             (storage_key, storage_provider, cdn_url, file_name, file_size_bytes, mime_type, width, height) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+             RETURNING id`,
+            [
+              imageUrl.storage_key, 'cloudinary', imageUrl.uri, imageUrl.fileName,
+              imageUrl.fileSize, imageUrl.mimeType, imageUrl.width, imageUrl.height
+
+            ]
           );
-          images.push(imageResult.rows[0]);
+          images.push(imageResult.rows[0].id);
         }
       }
 
-      // Insert room types with pricing rules
-      if (property.roomTypes && property.roomTypes.length > 0) {
-        for (const room of property.roomTypes) {
-          const roomResult = await client.query(
-            `INSERT INTO room_types 
-             (property_id, name, description, capacity, bed_count, bathroom_count,
-              size_sqft, base_price, weekly_rate, monthly_rate, currency, is_active, amenities)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-             RETURNING *`,
-            [
-              newProperty.id,
-              room.name,
-              room.description || null,
-              room.capacity || null,
-              room.bed_count || null,
-              room.bathroom_count || null,
-              room.size_sqft || null,
-              room.basePrice || null,
-              room.weeklyRate || null,
-              room.monthlyRate || null,
-              room.currency || "USD",
-              room.is_active !== false,
-              JSON.stringify(room.amenities || []),
-            ]
-          );
-
-          const roomTypeId = roomResult.rows[0].id;
-
-          // Insert pricing rules
-          if (room.pricingRules && room.pricingRules.length > 0) {
-            for (const rule of room.pricingRules) {
-              await client.query(
-                `INSERT INTO room_pricing_rules
-                 (room_type_id, start_date, end_date, nightly_rate, min_stay, max_stay, note)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-                [
-                  roomTypeId,
-                  rule.startDate,
-                  rule.endDate,
-                  rule.nightlyRate || null,
-                  rule.minStay || 1,
-                  rule.maxStay || null,
-                  rule.note || null,
-                ]
-              );
-            }
-          }
-
-          // Insert duration discounts
-          if (room.durationDiscounts && room.durationDiscounts.length > 0) {
-            for (const discount of room.durationDiscounts) {
-              await client.query(
-                `INSERT INTO room_duration_discounts
-                 (room_type_id, stay_type, discount_percent)
-                 VALUES ($1, $2, $3)`,
-                [roomTypeId, discount.stayType, discount.discountPercent]
-              );
-            }
-          }
-
-          // Generate rate calendar (90 days ahead)
-          await client.query(
-            `SELECT refresh_rate_calendar($1, CURRENT_DATE, (CURRENT_DATE + INTERVAL '90 days')::date)`,
-            [roomTypeId]
-          );
-
-          // Index in Redis (non-blocking)
-          await this.indexPropertyInRedis(newProperty.id, roomTypeId, {
-            basePrice: room.basePrice || 0,
-            bedrooms: room.bed_count || 0,
-            bathrooms: room.bathroom_count || 0,
-            type: room.name,
-            status: room.is_active !== false,
-            addressId: addressId,
-          });
-        }
+      console.log({images})
+      for (let i = 0; i < images.length; i++) {
+        await client.query(
+          `INSERT INTO property_images
+          (property_id, image_id, display_order, is_primary)
+          VALUES ($1, $2, $3, $4)`,
+          [
+            newProperty.id,
+            images[i],
+            i,
+            i == 0
+          ]
+        )
       }
 
       await client.query("COMMIT");
@@ -470,7 +634,7 @@ export class PropertyModel {
     try {
       const cached = (await redisClient.get(cacheKey))?.toString();
       if (cached) {
-        console.log("Cache hit for property:", id);
+        // console.log("Cache hit for property:", id);
         return JSON.parse(cached);
       }
     } catch (error) {
@@ -557,6 +721,54 @@ export class PropertyModel {
 
   // Fixed searchRoomTypes method - replace in your PropertyModel class
 
+  async quickSearch(query: string, latitude: number, longitude: number, radius: number, first = 10) {
+    // const cacheKey = `search:${JSON.stringify(input)}`;
+    try {
+      console.log(query, latitude, longitude, radius)
+      let sqlQuery = this.buildAddressFilter1(query, latitude, longitude, radius)
+      const parsed = this.parseAddressQuery(query)
+      console.log({parsed})
+      let search_type 
+      if(parsed.useCity) {
+        search_type = 'city'
+      } else if (parsed.usePostalCode) {
+        search_type = 'postal_code'
+      } else {
+        search_type = 'text_search'
+      }
+  
+      sqlQuery += `LIMIT ${first}`
+      console.log({sqlQuery})
+      console.time('quick')
+  
+      const result = await this.pool.query(sqlQuery)
+      const final_map = result.rows.map(row => ({
+        id: row?.id || null,
+        city: {
+          id: row?.city_id,
+          name: row?.city_name
+        },
+        country: {
+          id: row?.country_id,
+          name: row?.country_name
+        },
+        geom: row?.geom,
+        postal_code: row?.postal_code,
+        street: row?.street
+      }))
+      console.log({reS: result.rows})
+      console.timeEnd('quick')
+
+
+      return {
+        quickSearch: final_map,
+        search_type
+      }
+    } catch (error) {
+      throw error
+    }
+  }
+
   async searchRoomTypes(
     input: SearchRoomsInput,
     requestedFields: string[]
@@ -565,8 +777,10 @@ export class PropertyModel {
     pageInfo: { hasNextPage: boolean; endCursor: string | null };
     totalCount: number;
   }> {
+    console.log({input})
     const {
       propertyType,
+      sale_status,
       beds,
       bathrooms,
       minPrice,
@@ -574,7 +788,8 @@ export class PropertyModel {
       minSize,
       maxSize,
       amenities,
-      address,
+      query,
+      value,
       checkIn,
       checkOut,
       first = PAGINATION_LIMITS.DEFAULT,
@@ -591,38 +806,60 @@ export class PropertyModel {
     );
   }
 
+  console.log({first, query, value, after, propertyType})
+
   // Check cache
   const cacheKey = `search:${JSON.stringify(input)}`;
   try {
     const cached = (await redisClient.get(cacheKey))?.toString();
     if (cached) {
       console.log("Cache hit for search");
-      return JSON.parse(cached);
+      // return JSON.parse(cached);
     }
   } catch (error) {
     console.error("Redis cache error:", error);
   }
 
+  const rtFields = this.mapGraphQLFieldsToColumns(requestedFields, "rt");
+  const pFields = requestedFields
+    .filter((f) => f.startsWith("p."))
+    .map((f) => `${f} AS ${f.replace(".", "_")}`);
+  // console.log({pFields, requestedFields})
+  const fields = [...rtFields, ...pFields];
+  // const addressFilter = `
+  //   WITH filtered_addresses AS (
+  //     ${this.buildAddressFilter(query, latitude, longitude, radius)}
+  //   )
+  // `
+  // const useAddressFilter = query || (latitude && longitude && radius) ? true : false
+
+  let sqlQuery = `
+    SELECT 
+      ${fields.join(', ')}
+    FROM room_types rt
+    INNER JOIN properties p ON rt.property_id = p.id
+	  INNER JOIN addresses a ON a.id = p.address_id
+	  INNER JOIN cities c ON c.id = a.city_id
+	  INNER JOIN countries co ON co.id = c.country_id
+  `
+
   // Calculate duration if dates provided
   let duration: string | undefined;
-  let nights: number | undefined;
-  if (checkIn && checkOut) {
-    const result = await this.pool.query(
-      `SELECT calculate_nights($1, $2) as nights`,
-      [checkIn, checkOut]
-    );
-    nights = result.rows[0]?.nights || 0;
-    duration = this.calculateDuration(checkIn, checkOut);
-  }
 
   // Build query
   const conditions: string[] = [];
   const params: any[] = [];
 
   // Property type filter
-  if (propertyType) {
-    params.push(propertyType);
-    conditions.push(`p.property_type = $${params.length}`);
+  if (propertyType && propertyType.length > 0) {
+    const p_types_lower_case = propertyType.map(type => type.toLowerCase())
+    params.push(p_types_lower_case);
+    conditions.push(`p.property_type = ANY($${params.length})`);
+  }
+
+  if (sale_status) {
+    params.push(sale_status);
+    conditions.push(`p.sale_status = $${params.length}`);
   }
 
   // Bed/bath filters
@@ -661,188 +898,142 @@ export class PropertyModel {
     conditions.push(`rt.amenities @> $${params.length}::jsonb`);
   }
 
-  // Location filter (geospatial)
-  if (latitude !== undefined && longitude !== undefined && radius) {
-    params.push(longitude, latitude, radius * 1000); // Convert km to meters
-    const lonIdx = params.length - 2;
-    const latIdx = params.length - 1;
-    const radiusIdx = params.length;
-    
-    conditions.push(`
-      ST_DWithin(
-        a.geom,
-        ST_SetSRID(ST_MakePoint($${lonIdx}, $${latIdx}), 4326)::geography,
-        $${radiusIdx}
-      )
-    `);
+  if(after) {
+    params.push(after)
+    conditions.push(`rt.id >= $${params.length}`)
   }
 
-  // Address search (full-text)
-  if (address) {
-    params.push(`%${address}%`);
-    conditions.push(`(
-      p.title ILIKE $${params.length}
-      OR a.street ILIKE $${params.length}
-      OR c.name ILIKE $${params.length}
-      OR co.name ILIKE $${params.length}
-    )`);
-  }
-
-  // Availability filter - FIXED: Always include bookings join, but conditionally filter
-  const hasDateFilter = !!(checkIn && checkOut);
-  let availabilityJoin = `
-    INNER JOIN room_units u ON u.room_type_id = rt.id AND u.status = 'active'
-  `;
-
-  if (hasDateFilter) {
-    params.push(checkIn, checkOut);
-    const checkInIdx = params.length - 1;
-    const checkOutIdx = params.length;
-    
-    availabilityJoin += `
-      LEFT JOIN bookings b ON b.unit_id = u.id
-        AND b.status = 'confirmed'
-        AND daterange(b.check_in, b.check_out, '[]') && daterange($${checkInIdx}, $${checkOutIdx}, '[]')
-    `;
-    conditions.push("b.id IS NULL");
-  }
-
-  // Only show active properties
-  // conditions.push("p.status = 'published'");
   conditions.push("rt.is_active = true");
+  if (query && value) {
+    
+    switch (query) {
+      case 'city': {
+        params.push(parseInt(value))
+        conditions.push(`c.id = $${params.length}`)
+      }
+    }
+  }
+  if(checkIn && checkOut) {
+    conditions.push(`EXISTS (${this.buildAvailabilityFilter(checkIn, checkOut)})`)
+  }
 
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  if (conditions.length > 0) {
+    sqlQuery += ` WHERE ${conditions.join(' AND ')}`
+  }
+
+  if(latitude && longitude) {
+    sqlQuery += ` ORDER BY distance ASC, rt.id ASC`;
+    // params.latitude = latitude
+  } else {
+    sqlQuery += ` ORDER BY rt.base_price ASC, rt.id ASC`
+  }
+
+  console.log(typeof first)
+  params.push(first)
+  sqlQuery += ` LIMIT $${params.length}`
 
   // Build price fields based on duration
-  let priceField = "rt.base_price AS derived_price";
-  if (duration === "monthly" && checkIn && checkOut) {
-    priceField = "COALESCE(rt.monthly_rate, rt.base_price) AS derived_price";
-  } else if (duration === "weekly" && checkIn && checkOut) {
-    priceField = "COALESCE(rt.weekly_rate, rt.base_price) AS derived_price";
-  } else if (duration === "daily" && checkIn && checkOut) {
-    // Reuse existing date params
-    const startIdx = params.findIndex(p => p === checkIn);
-    const endIdx = params.findIndex(p => p === checkOut);
-    priceField = `
-      COALESCE((
-        SELECT AVG(rc.nightly_rate)
-        FROM rate_calendar rc
-        WHERE rc.room_type_id = rt.id
-          AND rc.date >= $${startIdx + 1}::date
-          AND rc.date < $${endIdx + 1}::date
-      ), rt.base_price) AS derived_price
-    `;
-  }
-
-  // Pagination
-  let paginationClause = "";
-  if (after) {
-    params.push(after);
-    paginationClause = `AND rt.id > $${params.length}`;
-  }
-
-  params.push(first);
-  const limitClause = `LIMIT $${params.length}`;
+  // let priceField = "rt.base_price AS derived_price";
+  // if (duration === "monthly" && checkIn && checkOut) {
+  //   priceField = "COALESCE(rt.monthly_rate, rt.base_price) AS derived_price";
+  // } else if (duration === "weekly" && checkIn && checkOut) {
+  //   priceField = "COALESCE(rt.weekly_rate, rt.base_price) AS derived_price";
+  // } else if (duration === "daily" && checkIn && checkOut) {
+  //   // Reuse existing date params
+  //   const startIdx = params.findIndex(p => p === checkIn);
+  //   const endIdx = params.findIndex(p => p === checkOut);
+  //   priceField = `
+  //     COALESCE((
+  //       SELECT AVG(rc.nightly_rate)
+  //       FROM rate_calendar rc
+  //       WHERE rc.room_type_id = rt.id
+  //         AND rc.date >= $${startIdx + 1}::date
+  //         AND rc.date < $${endIdx + 1}::date
+  //     ), rt.base_price) AS derived_price
+  //   `;
+  // }
 
   // Build field list
-  const rtFields = this.mapGraphQLFieldsToColumns(requestedFields, "rt");
-  const pFields = requestedFields
-    .filter((f) => f.startsWith("p."))
-    .map((f) => `${f} AS ${f.replace(".", "_")}`);
-  const fields = [...rtFields, ...pFields, priceField];
+
 
   // FIXED: Conditional HAVING clause based on whether we have date filtering
-  const havingClause = hasDateFilter 
-    ? "HAVING COUNT(DISTINCT CASE WHEN b.id IS NULL THEN u.id END) > 0"
-    : "HAVING COUNT(DISTINCT u.id) > 0";
-
-  // Main query
-  const roomTypesQuery = `
-    SELECT 
-      ${fields.join(", ")},
-      ${hasDateFilter 
-        ? "COUNT(DISTINCT CASE WHEN b.id IS NULL THEN u.id END) AS available_units,"
-        : "COUNT(DISTINCT u.id) AS available_units,"
-      }
-      COUNT(DISTINCT u.id) AS total_units
-    FROM room_types rt
-    INNER JOIN properties p ON rt.property_id = p.id
-    INNER JOIN addresses a ON p.address_id = a.id
-    INNER JOIN cities c ON a.city_id = c.id
-    INNER JOIN countries co ON c.country_id = co.id
-    ${availabilityJoin}
-    ${whereClause}
-    GROUP BY rt.id, p.id, a.id, c.id, co.id
-    ${havingClause}
-    ORDER BY rt.created_at DESC, rt.id DESC
-    ${paginationClause}
-    ${limitClause}
-  `;
+  // const havingClause = hasDateFilter 
+  //   ? "HAVING COUNT(DISTINCT CASE WHEN b.id IS NULL THEN u.id END) > 0"
+  //   : "HAVING COUNT(DISTINCT u.id) > 0";
 
   // Count query - FIXED: Same conditional logic
-  const countParams = params.slice(0, params.length - (after ? 2 : 1));
-  const countQuery = `
-    SELECT COUNT(*) as count FROM (
-      SELECT DISTINCT rt.id
-      FROM room_types rt
-      INNER JOIN properties p ON rt.property_id = p.id
-      INNER JOIN addresses a ON p.address_id = a.id
-      INNER JOIN cities c ON a.city_id = c.id
-      INNER JOIN countries co ON c.country_id = co.id
-      ${availabilityJoin}
-      ${whereClause}
-      GROUP BY rt.id
-      ${havingClause}
-    ) subquery
-  `;
+  // const countParams = params.slice(0, params.length - (after ? 2 : 1));
+  // const countQuery = `
+  //   SELECT COUNT(*) as count FROM (
+  //     SELECT DISTINCT rt.id
+  //     FROM room_types rt
+  //     INNER JOIN properties p ON rt.property_id = p.id
+  //     INNER JOIN addresses a ON p.address_id = a.id
+  //     INNER JOIN cities c ON a.city_id = c.id
+  //     INNER JOIN countries co ON c.country_id = co.id
+  //     ${availabilityJoin}
+  //     ${whereClause}
+  //     GROUP BY rt.id
+  //     ${havingClause}
+  //   ) subquery
+  // `;
 
-  console.log({roomTypesQuery, params, countQuery});
+  // console.log({ sqlQuery, params});
 
   try {
     // Execute queries in parallel
-    const [roomTypesResult, countResult] = await Promise.all([
-      this.pool.query(roomTypesQuery, params),
-      this.pool.query(countQuery, countParams),
-    ]);
+    // const [roomTypesResult] = await Promise.all([
+    //   // this.pool.query(roomTypesQuery, params),
+    //   this.pool.query(sqlQuery),
+    //   // this.pool.query(countQuery, countParams),
+    // ]);
+    console.log({sqlQuery, params})
+    console.time('db')
+    const roomTypesResult = await this.pool.query(sqlQuery, params)
+    console.timeEnd('db')
 
     // Map results
+    console.time('mapping')
+    console.log({roomtypes: roomTypesResult.rows[0]})
     const roomTypes: RoomType[] = roomTypesResult.rows.map((row) => ({
       id: row.id,
-      property_id: row.property_id,
-      name: row.name,
-      description: row.description,
-      capacity: row.capacity,
-      bed_count: row.bed_count,
-      bathroom_count: row.bathroom_count,
-      size_sqft: row.size_sqft,
-      basePrice: row.base_price,
-      derivedPrice: parseFloat(row.derived_price || row.base_price),
-      weeklyRate: row.weekly_rate,
-      monthlyRate: row.monthly_rate,
-      currency: row.currency,
-      is_active: row.is_active,
-      amenities: row.amenities || [],
-      availableUnits: parseInt(row.available_units || '0'),
-      totalUnits: parseInt(row.total_units || '0'),
+      property_id: row?.property_id,
+      name: row?.name,
+      description: row?.description,
+      capacity: row?.capacity,
+      bed_count: row?.bed_count,
+      bathroom_count: row?.bathroom_count,
+      size_sqft: row?.size_sqft,
+      base_price: row?.base_price,
+      derivedPrice: parseFloat(row?.derived_price || row?.base_price),
+      weeklyRate: row?.weekly_rate,
+      monthlyRate: row?.monthly_rate,
+      currency: row?.currency,
+      is_active: row?.is_active,
+      amenities: row?.amenities || [],
+      created_at: row?.created_at,
+      availableUnits: parseInt(row?.available_units || '0'),
+      totalUnits: parseInt(row?.total_units || '0'),
       duration,
       property: {
-        id: row.p_id,
-        realtor_id: row.p_realtor_id,
-        address_id: row.p_address_id,
-        title: row.p_title,
-        speciality: row.p_speciality,
-        amenities: row.p_amenities,
-        price: row.p_price,
-        description: row.p_description,
-        property_type: row.p_property_type,
-        sale_status: row.p_sale_status,
-        status: row.p_status,
-        created_at: row.p_created_at,
-        updated_at: row.p_updated_at,
+        id: row?.p_id,
+        realtor_id: row?.p_realtor_id,
+        address_id: row?.p_address_id,
+        title: row?.p_title,
+        speciality: row?.p_speciality,
+        amenities: row?.p_amenities,
+        price: row?.p_price,
+        description: row?.p_description,
+        property_type: row?.p_property_type,
+        sale_status: row?.p_sale_status,
+        status: row?.p_status,
+        created_at: row?.p_created_at,
+        updated_at: row?.p_updated_at,
       },
     }));
 
-    const totalCount = parseInt(countResult.rows[0]?.count || "0");
+    const totalCount = 10;
+    // const totalCount = parseInt(countResult.rows[0]?.count || "0");
     const hasNextPage = roomTypes.length === first;
     const endCursor = hasNextPage ? roomTypes[roomTypes.length - 1].id.toString() : null;
 
@@ -855,6 +1046,9 @@ export class PropertyModel {
       totalCount,
     };
 
+    console.timeEnd('mapping')
+    console.time('cache')
+
     // Cache result
     try {
       if (roomTypesResult.rows.length > 0) {
@@ -863,6 +1057,7 @@ export class PropertyModel {
     } catch (error) {
       console.error("Redis cache set error:", error);
     }
+    console.timeEnd('cache')
 
     return result;
   } catch (error) {
@@ -877,7 +1072,7 @@ export class PropertyModel {
 
   async getRoomType(id: number, requestedFields: string[]): Promise<RoomType | null> {
     const cacheKey = `roomType:${id}`;
-
+    console.log({cacheKey})
     try {
       const cached = (await redisClient.get(cacheKey))?.toString();
       if (cached) {
@@ -896,11 +1091,16 @@ export class PropertyModel {
     const fields = [...rtFields, ...pFields];
 
     const query = `
-      SELECT ${fields.join(", ")}
+      SELECT 
+        ${fields.join(", ")},
+        (SELECT COUNT(*) FROM reviews WHERE room_type_id = rt.id) AS total_reviews,
+        (SELECT ROUND(AVG(rating), 1) FROM reviews WHERE room_type_id = rt.id) AS avg_rating
       FROM room_types rt
       INNER JOIN properties p ON rt.property_id = p.id
-      WHERE rt.id = $1
+      WHERE rt.id = $1;
     `;
+
+    console.log({query})
 
     const result = await this.pool.query(query, [id]);
 
@@ -918,7 +1118,7 @@ export class PropertyModel {
       bed_count: row.bed_count,
       bathroom_count: row.bathroom_count,
       size_sqft: row.size_sqft,
-      basePrice: row.base_price,
+      base_price: row.base_price,
       weeklyRate: row.weekly_rate,
       monthlyRate: row.monthly_rate,
       currency: row.currency,
@@ -939,6 +1139,8 @@ export class PropertyModel {
         created_at: row.p_created_at,
         updated_at: row.p_updated_at,
       },
+      totalReviews: row.total_reviews,
+      avg_rating: row.avg_rating
     };
 
     try {
@@ -952,6 +1154,173 @@ export class PropertyModel {
     }
 
     return roomType;
+  }
+
+  async getRoomTypes(ids: number[], requestedFields: string[]): Promise<{
+    edges: { node: RoomType; cursor: string }[];
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+    totalCount: number;
+  }> {
+    // const cacheKey = `roomType:${id}`;
+    // console.log({cacheKey})
+    // try {
+    //   const cached = (await redisClient.get(cacheKey))?.toString();
+    //   if (cached) {
+    //     console.log("Cache hit for room type:", id);
+    //     return JSON.parse(cached);
+    //   }
+    // } catch (error) {
+    //   console.error("Redis get error:", error);
+    // }
+
+    const rtFields = this.mapGraphQLFieldsToColumns(requestedFields, "rt");
+    const pFields = requestedFields
+      .filter((f) => f.startsWith("p."))
+      .map((f) => `${f} AS ${f.replace(".", "_")}`);
+
+    const fields = [...rtFields, ...pFields];
+
+    console.log({fields})
+
+    const query = `
+      SELECT 
+        ${fields.join(", ")},
+        (SELECT COUNT(*) FROM reviews WHERE room_type_id = rt.id) AS total_reviews,
+        (SELECT ROUND(AVG(rating), 1) FROM reviews WHERE room_type_id = rt.id) AS avg_rating
+      FROM room_types rt
+      INNER JOIN properties p ON rt.property_id = p.id
+      WHERE rt.id = ANY($1);
+    `;
+
+    console.log({query})
+
+    const result = await this.pool.query(query, [ids]);
+
+    if (!result.rows[0]) {
+      return null;
+    }
+
+    const row = result.rows;
+    console.log({row})
+    // const roomType: RoomType = {
+    //   id: row.id,
+    //   property_id: row.property_id,
+    //   name: row.name,
+    //   description: row.description,
+    //   capacity: row.capacity,
+    //   bed_count: row.bed_count,
+    //   bathroom_count: row.bathroom_count,
+    //   size_sqft: row.size_sqft,
+    //   base_price: row.base_price,
+    //   weeklyRate: row.weekly_rate,
+    //   monthlyRate: row.monthly_rate,
+    //   currency: row.currency,
+    //   is_active: row.is_active,
+    //   amenities: row.amenities || [],
+    //   property: {
+    //     id: row.p_id,
+    //     realtor_id: row.p_realtor_id,
+    //     address_id: row.p_address_id,
+    //     title: row.p_title,
+    //     speciality: row.p_speciality,
+    //     amenities: row.p_amenities,
+    //     price: row.p_price,
+    //     description: row.p_description,
+    //     property_type: row.p_property_type,
+    //     sale_status: row.p_sale_status,
+    //     status: row.p_status,
+    //     created_at: row.p_created_at,
+    //     updated_at: row.p_updated_at,
+    //   },
+    //   totalReviews: row.total_reviews,
+    //   avg_rating: row.avg_rating
+    // };
+
+    const roomTypes: RoomType[] = result.rows.map((row) => ({
+      id: row.id,
+      property_id: row?.property_id,
+      name: row?.name,
+      description: row?.description,
+      capacity: row?.capacity,
+      bed_count: row?.bed_count,
+      bathroom_count: row?.bathroom_count,
+      size_sqft: row?.size_sqft,
+      base_price: row?.base_price,
+      derivedPrice: parseFloat(row?.derived_price || row?.base_price),
+      weeklyRate: row?.weekly_rate,
+      monthlyRate: row?.monthly_rate,
+      currency: row?.currency,
+      is_active: row?.is_active,
+      amenities: row?.amenities || [],
+      created_at: row?.created_at,
+      availableUnits: parseInt(row?.available_units || '0'),
+      totalUnits: parseInt(row?.total_units || '0'),
+      property: {
+        id: row?.p_id,
+        realtor_id: row?.p_realtor_id,
+        address_id: row?.p_address_id,
+        title: row?.p_title,
+        speciality: row?.p_speciality,
+        amenities: row?.p_amenities,
+        price: row?.p_price,
+        description: row?.p_description,
+        property_type: row?.p_property_type,
+        sale_status: row?.p_sale_status,
+        status: row?.p_status,
+        created_at: row?.p_created_at,
+        updated_at: row?.p_updated_at,
+      },
+    }));
+
+    const totalCount = 10;
+    // const totalCount = parseInt(countResult.rows[0]?.count || "0");
+    const hasNextPage = false;
+    const endCursor = hasNextPage ? roomTypes[roomTypes.length - 1].id.toString() : null;
+
+    const results = {
+      edges: roomTypes.map((node) => ({
+        node,
+        cursor: node.id.toString(),
+      })),
+      pageInfo: { hasNextPage, endCursor },
+      totalCount,
+    };
+
+
+    return results;
+  }
+
+  async searchRecents(userId: number): Promise<Recents[]> {
+    try {
+      const searchKey = `recent_searches:${userId}`
+      const recents = (await redisClient.zRange(searchKey, 0, 19))
+      console.timeEnd('connect')
+
+      const validArray = `[${recents.join(',')}]`
+      console.log({recents, validArray: JSON.parse(validArray)})
+
+      return JSON.parse(validArray)
+    } catch (error) {
+      throw error
+    }
+  }
+
+  async addToRecents(input: Omit<Recents, 'userId'> & {userId: string}): Promise<Recents | null> {
+    try {
+      const searchKey = `recent_searches:${input.userId}`
+      const timestamp = Date.now()
+      const searchData = JSON.stringify(input)
+      const pipeline = redisClient.multi()
+  
+      pipeline.zAdd(searchKey, [{value: searchData, score: timestamp}])
+  
+      pipeline.zRemRangeByRank(searchKey, 0, -21)
+      await pipeline.exec()
+  
+      return {...input, userId: parseInt(input.userId)}
+    } catch (error) {
+      throw error
+    }
   }
 
   // ============================================
@@ -972,7 +1341,7 @@ export class PropertyModel {
     try {
       const cached = (await redisClient.get(cacheKey))?.toString();
       if (cached) {
-        return JSON.parse(cached);
+        // return JSON.parse(cached);
       }
     } catch (error) {
       console.error("Redis get error:", error);
@@ -1069,9 +1438,9 @@ export class PropertyModel {
 
   async update(
     id: number,
-    updates: Partial<Omit<Property, "id" | "created_at">> & {
+    updates: Partial<Omit<PropertyEdit, "id" | "created_at">> & {
       address?: Omit<Address, "id" | "created_at">;
-      image_urls?: string[];
+      images?: ImageManageMentInput;
     }
   ): Promise<Property | null> {
     const client = await this.pool.connect();
@@ -1084,6 +1453,7 @@ export class PropertyModel {
       if (!existingProperty) {
         throw new Error("Property not found");
       }
+      
 
       let addressId = existingProperty.address_id;
 
@@ -1093,18 +1463,96 @@ export class PropertyModel {
       }
 
       // Handle images
-      if (updates.image_urls && updates.image_urls.length > 0) {
-        // Delete existing images
-        await client.query("DELETE FROM property_images WHERE property_id = $1", [id]);
+      if (updates.images) {
 
-        // Insert new images
-        for (const imageUrl of updates.image_urls) {
-          await client.query(
-            "INSERT INTO property_images (property_id, url) VALUES ($1, $2)",
-            [id, imageUrl]
+        if (updates.images.remove && updates.images.remove.length > 0) {
+          console.log('deleting')
+          const imagesToDelete = await client.query(
+            `SELECT i.storage_key 
+             FROM images i
+             JOIN property_images pi ON i.id = pi.image_id
+             WHERE pi.property_id = $1 AND i.id = ANY($2)`,
+            [id, updates.images.remove]
           );
+          const storage_keys = []
+          for (const img of imagesToDelete.rows) {
+            storage_keys.push(img.storage_key)
+          }
+          try {
+            await deleteFromCloudinary(storage_keys)
+          } catch (error) {
+            
+          }
+          console.log(updates.images.remove)
+          await client.query(
+            'DELETE FROM images WHERE id = ANY($1)',
+            [updates.images.remove]
+          )
         }
+
+        if (updates.images.add && updates.images.add.length > 0) {
+          for (const image of updates.images.add) {
+            const imageResult = await client.query(
+              `INSERT INTO images 
+               (storage_key, storage_provider, cdn_url, file_name, file_size_bytes, mime_type, width, height) 
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+               RETURNING id`,
+              [
+                image.storage_key,
+                'cloudinary',
+                image.uri,
+                image.fileName || `property-${Date.now()}.jpg`,
+                image.fileSize,
+                image.mimeType || 'image/jpeg',
+                image.width,
+                image.height,
+              ]
+            );
+
+            await client.query(
+              `INSERT INTO property_images (property_id, image_id, display_order, is_primary) 
+              VALUES ($1, $2, $3, $4)`,
+              [id, imageResult.rows[0].id, 0, false]
+            );
+          }
+        }
+
+        // 6c. Update existing images (order, primary status)
+        if (updates.images.update && updates.images.update.length > 0) {
+          for (const imageUpdate of updates.images.update) {
+            const updates: string[] = [];
+            const values: any[] = [];
+            let paramCount = 1;
+            if (imageUpdate.display_order !== undefined) {
+              updates.push(`display_order = $${paramCount}`);
+              values.push(imageUpdate.display_order);
+              paramCount++;
+            }
+            if (imageUpdate.is_primary !== undefined) {
+              // If setting as primary, first unset all others
+              if (imageUpdate.is_primary) {
+                await client.query(
+                  'UPDATE property_images SET is_primary = false WHERE property_id = $1',
+                [id]
+                )
+              }
+              updates.push(`is_primary = $${paramCount}`);
+              values.push(imageUpdate.is_primary);
+              paramCount++;
+            }
+            if (updates.length > 0) {
+              values.push(id, imageUpdate.id);
+              await client.query(
+                `UPDATE property_images 
+                 SET ${updates.join(', ')} 
+                 WHERE property_id = $${paramCount} AND image_id = $${paramCount + 1}`,
+                values
+              );
+            }
+          }
+        }       
       }
+
 
       // Build dynamic update query
       const updateFields: string[] = [];
@@ -1123,10 +1571,10 @@ export class PropertyModel {
       ];
 
       for (const field of allowedFields) {
-        if (updates[field] !== undefined) {
+        if (updates[field] !== undefined && updates[field] !== null) {
           updateFields.push(`${field} = $${paramIndex++}`);
           updateValues.push(
-            field === "amenities" ? JSON.stringify(updates[field]) : updates[field]
+            field === "amenities" ? JSON.stringify(updates[field]) : field === "status" ? updates.status.toLocaleLowerCase() : updates[field]
           );
         }
       }
@@ -1197,7 +1645,10 @@ export class PropertyModel {
   // DELETE PROPERTY
   // ============================================
 
-  async delete(id: number): Promise<boolean> {
+  async delete(id: number): Promise<{
+    success: boolean,
+    message: string
+  }> {
     const client = await this.pool.connect();
 
     try {
@@ -1206,7 +1657,10 @@ export class PropertyModel {
       // Check if property exists
       const property = await this.findById(id, ["id", "realtor_id"]);
       if (!property) {
-        return false;
+        return {
+          success: false,
+          message: `Property doesn't exist`
+        };
       }
 
       // Check for active bookings
@@ -1260,7 +1714,10 @@ export class PropertyModel {
         console.error("Redis cleanup error:", error);
       }
 
-      return (deleteResult.rowCount ?? 0) > 0;
+      return {
+        success: (deleteResult.rowCount ?? 0) > 0,
+        message: 'Property deleted'
+      }
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Property deletion error:", error);
@@ -2389,3 +2846,31 @@ export default new PropertyModel(pool);
 // }
 
 // export default new PropertyModel(pool);
+
+
+// -- This is what your application should use
+// SELECT 
+//     a.id,
+//     a.street,
+//     a.postal_code,
+//     ci.name as city_name,
+//     co.name as country_name,
+//     co.code as country_code,
+//     -- Weighted relevance scoring
+//     (
+//         CASE 
+//             WHEN a.postal_code = '81651' THEN 100
+//             WHEN ci.name ILIKE '81651' THEN 80
+//             WHEN ci.name ILIKE '81651' || '%' THEN 60
+//             ELSE ts_rank(a.search_vector, plainto_tsquery('english', '81651')) * 40
+//         END
+//     ) as relevance_score
+// FROM addresses a
+// JOIN cities ci ON a.city_id = ci.id
+// JOIN countries co ON ci.country_id = co.id
+// WHERE 
+//     a.postal_code = '81651'
+//     OR ci.name ILIKE '81651' || '%'
+//     OR a.search_vector @@ plainto_tsquery('english', '81651')
+// ORDER BY relevance_score DESC
+// LIMIT 50;

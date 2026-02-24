@@ -1,12 +1,14 @@
 // Updated property resolver
 import DataLoader from "dataloader";  
 import cloudinary from "../../config/cloudinary.js";
-import PropertyModel, { Property, SearchRoomsInput } from "../../models/Property.js";
+import PropertyModel, { Property, Recents, SearchRoomsInput } from "../../models/Property.js";
 import { User } from "../../models/User.js";
 import { getNestedRequestedFields, getRequestedFields, getRequestedFieldss } from "../../utils/getyRequestedFields.js";
 import { addressLoader, userLoader } from "./user.js";
 import pool from "../../config/database.js";
-import { GraphQLScalarType, Kind } from "graphql";
+import { GraphQLError, GraphQLScalarType, Kind } from "graphql";
+import { reveiwLoader } from "./review.js";
+import { info } from "console";
 
 // Date scalar
 const dateScalar = new GraphQLScalarType({
@@ -55,16 +57,26 @@ export default {
       if (!property) return null;
       return property;
     },    
-    getListings: async (_: any, { realtor_id }: { realtor_id: string }, { user }: { user: User }, info: any) => {
-      if (!user || user.id !== parseInt(realtor_id)) throw new Error("Unauthorized");
+    myProperties: async (_: any, { realtor_id }: { realtor_id: string }, { user }: { user: User }, info: any) => {
+      if (!user) {
+        throw new GraphQLError('Access token expired', {
+          extensions: {
+            code: 'UNAUTHENTICATED',
+            http: {status: 401 }
+          }
+        })
+      }
       const requestedFields = getRequestedFields(info);
       return await PropertyModel.findByRealtor(parseInt(realtor_id), requestedFields);
     },
+
     searchRoomTypes: async (_: any, {input}: {input: SearchRoomsInput}, __: any, info: any) => {
-      console.log({sos: 'wiwoiw'})
+      console.time('srt resolver')
       const requestedFields = getNestedRequestedFields(info)
-      // console.log({requestedFields})
-      return await PropertyModel.searchRoomTypes(input, requestedFields)
+      // console.log({input})
+      const result = await PropertyModel.searchRoomTypes(input, requestedFields)
+      console.timeEnd('srt resolver')
+      return result
     },
 
     getAvailability: async (_, { id, startDate, endDate }) => {
@@ -76,34 +88,68 @@ export default {
     getRoomType: async (_, {id}: {id: number}, __: any, info: any) => {
       const requestedFields = getRequestedFields(info)          
       return await PropertyModel.getRoomType(id, requestedFields)
-    }
+    },
+
+    getRoomTypes: async (_, {ids}: {ids: string[]}, __: any, info: any) => {
+      const requiredFields = getNestedRequestedFields(info)
+      return await PropertyModel.getRoomTypes(ids.map(id => parseInt(id)), requiredFields)
+    },
+    
+    quickSearch: async (_, {query, latitude, longitude, radius}: {query: string, latitude: number, longitude: null, radius: number}, __:any, info: any) => {
+      return await PropertyModel.quickSearch(query, latitude, longitude, radius)
+    },
+
+    searchRecents: async (_, {userId}: {userId: string}, {user}: {user: User}) => {
+      // if (!user || !user?.id) throw new Error('Unauthorized')
+      // if (parseInt(userId) !== user.id) throw new Error('Wrong User')
+      return await PropertyModel.searchRecents(parseInt(userId))
+    },
   },
   Mutation: {
     createProperty: async (_: any, { input }: { input: any }, { user }: { user: User }) => {
+      if (!user) {
+        throw new GraphQLError('Access token expired', {
+          extensions: {
+            code: 'UNAUTHENTICATED',
+            http: {status: 401 }
+          }
+        })
+      }
       const property = await PropertyModel.create(input);
       propertyImageLoader.clear(property.id);
       return property;
     },
-    updateProperty: async (_: any, { id, input }: { id: string; input: Property }, { user }: { user: User }) => {
-      if (!user) throw new Error("Unauthorized");
+    updateProperty: async (_: any, { id, input }: { id: string; input: any }, { user }: { user: User }) => {
+      if (!user) {
+        throw new GraphQLError('Access token expired', {
+          extensions: {
+            code: 'UNAUTHENTICATED',
+            http: {status: 401 }
+          }
+        })
+      }
       const property = await PropertyModel.findById(parseInt(id));
-      if (!property || property.realtor_id !== user.id) throw new Error("Unauthorized");
+      if (!property || property.realtor_id !== user.id) throw new Error("Not authorized");
       const updatedProperty = await PropertyModel.update(parseInt(id), input);
       propertyImageLoader.clear(parseInt(id));
       return updatedProperty;
     },
     deleteProperty: async (_: any, { id }: { id: string }, { user }: { user: User }) => {
-      // if (!user) throw new Error("Unauthorized");
+      if (!user) {
+        throw new GraphQLError('Access token expired', {
+          extensions: {
+            code: 'UNAUTHENTICATED',
+            http: {status: 401 }
+          }
+        })
+      }
       const property = await PropertyModel.findById(parseInt(id));
-      // if (!property || property.realtor_id !== user.id) throw new Error("Unauthorized");
+      if (!property || property.realtor_id !== user.id) throw new Error("Not authorized");
       const result = await PropertyModel.delete(parseInt(id));
       propertyImageLoader.clear(parseInt(id));
       return result;
     },
-    addRoomUnit: async (_:any, {input}: {input: any}) => {
-      const unit = await PropertyModel.addRoomUnit(input)
-      return unit
-    },
+
     generateCloudinarySignature: async (_: any, __: any, { user }: { user: User }) => {
       if (!user) throw new Error("Unauthorized");
       const timestamp = Math.round(new Date().getTime() / 1000).toString();
@@ -117,6 +163,20 @@ export default {
         cloudName: process.env.CLOUDINARY_CLOUD_NAME,
         apiKey: process.env.CLOUDINARY_API_KEY,
       };
+    },
+    
+    addToRecents: async (_, {input}: {input: Omit<Recents, 'userId'> & {userId: string}}, {user}: {user: User}) => {
+      if (!user) {
+        throw new GraphQLError('Access token expired', {
+          extensions: {
+            code: 'UNAUTHENTICATED',
+            http: {status: 401 }
+          }
+        })
+      }
+      // if (parseInt(input.userId) !== user.id) throw new Error('Wrong User')
+      console.log({input})
+      return await PropertyModel.addToRecents(input)
     },
   },
   Property: {
@@ -138,12 +198,6 @@ export default {
     roomTypes: async (parent: Property) => {
       return await roomTypesLoader.load(parent.id)
     },
-    // units: async (parent: Property) => {
-    //   return await roomUnitLoader.load(parent.id)
-    // },
-    // pricing: async (parent: Property) => {
-    //   return await rateCalendarLoader.load(parent.id)
-    // },
 
   },
   RoomType: {
@@ -157,6 +211,9 @@ export default {
     images: async (parent) => {
       return await roomImageLoader.load(parent.id)
     }, 
+    reviews: async (parent) => {
+      return await reveiwLoader.load(parent.id)
+    }
     // property: async(parent, _, __, info) => {
     //   const requestedFields = getRequestedFields(info)
     //   console.log({requestedFields})
@@ -171,15 +228,17 @@ export default {
 };
 
 const propertyImageLoader = new DataLoader(async (propertyIds: readonly number[]) => {
+  // console.log({propertyIds})
   const query = `
     SELECT 
-      id, 
-      property_id, 
-      url, 
-      meta_data, 
-      caption
-    FROM property_images
-    WHERE property_id = ANY($1)
+      pi.id, 
+      pi.property_id, 
+      i.cdn_url,
+      i.width,
+      i.height
+    FROM property_images pi
+    JOIN Images i On i.id = pi.image_id
+    WHERE pi.property_id = ANY($1)
   `;
   const result = await pool.query(query, [propertyIds]);
   return propertyIds.map(id => result.rows.filter(row => row.property_id == id));
@@ -188,14 +247,12 @@ const propertyImageLoader = new DataLoader(async (propertyIds: readonly number[]
 const roomImageLoader = new DataLoader(async (propertyIds: readonly number[]) => {
   const query = `
     SELECT 
-      id, 
-      imageable_id, 
-      imageable_type,
-      url, 
-      meta_data, 
-      caption
-    FROM images
-    WHERE imageable_id = ANY($1) AND imageable_type = 'room'
+      i.id, 
+      i.cdn_url as url, 
+      rti.caption
+    FROM room_type_images rti
+    JOIN images i ON rti.image_id = i.id
+    WHERE rti.room_type_id = ANY($1) AND i.deleted_at IS NULL
   `;
   const result = await pool.query(query, [propertyIds]);
   return propertyIds.map(id => result.rows.filter(row => row.imageable_id == id));
@@ -226,10 +283,10 @@ const propertyReviewLoader = new DataLoader(async (propertyIds: readonly number[
   return propertyIds.map(id => result.rows.filter(row => row.property_id == id));
 });
 
-const roomTypesLoader = new DataLoader(async (propertyIds: readonly number[]) => {
+export const roomTypesLoader = new DataLoader(async (propertyIds: readonly number[]) => {
   const query = `
     SELECT * FROM room_types
-    WHERE property_id = ANY($1)
+    WHERE property_id = ANY($1) AND deleted_at IS NULL
   `;
   const result = await pool.query(query, [propertyIds]);
   return propertyIds.map(id => result.rows.filter(row => row.property_id == id));
@@ -299,25 +356,3 @@ const rateCalendarLoader = new DataLoader(async (roomTypesIds: readonly number[]
 //   const result = await pool.query(query, [roomTypesIds]);
 //   return roomTypesIds.map(id => result.rows.filter(row => row.room_type_id == id));
 // });
-
-
-const getNodeFields = (info: any): string[] => {
-  const fieldNodes = info.fieldNodes || info.fieldASTs;
-  const connectionField = fieldNodes
-    ?.find(node => node.name?.value?.includes('Properties'))
-    ?.selectionSet?.selections
-    ?.find((sel: any) => sel.name?.value === 'edges');
-
-  const nodeFields = connectionField?.selectionSet?.selections
-    ?.find((sel: any) => sel.name?.value === 'node')
-    ?.selectionSet?.selections;
-
-  if (!nodeFields) {
-    console.warn('No node fields found in query, defaulting to basic fields');
-    return ['id', 'title', 'price'];
-  }
-
-  return nodeFields
-    .filter((sel: any) => sel.kind === 'Field')
-    .map((sel: any) => sel.name.value);
-};

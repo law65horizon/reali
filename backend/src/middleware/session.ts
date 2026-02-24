@@ -29,6 +29,7 @@ interface TokenPair {
   accessToken: string;
   refreshToken: string;
   sessionId: string;
+  user?: any
 }
 
 // ============================================
@@ -39,11 +40,11 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret';
 
 const TTL = {
-  ACCESS_TOKEN: 15 * 60, // 15 minutes
-  REFRESH_TOKEN: 7 * 24 * 60 * 60, // 7 days
-  SESSION_REDIS: 7 * 24 * 60 * 60, // 7 days (matches refresh token)
+  ACCESS_TOKEN: 30 * 60, // 30 minutes
+  REFRESH_TOKEN: 30 * 24 * 60 * 60, // 30 days
+  SESSION_REDIS: 30 * 24 * 60 * 60, // 30 days (matches refresh token)
   DRAFT: 24 * 60 * 60, // 24 hours
-  BLACKLIST: 15 * 60, // 15 minutes (matches access token)
+  BLACKLIST: 30 * 60, // 30 minutes (matches access token)
 };
 
 // ============================================
@@ -91,6 +92,7 @@ export class SessionManager {
       accessToken,
       refreshToken,
       sessionId,
+      user: {id: sessionData.userId, email: sessionData.email}
     };
   }
 
@@ -99,11 +101,13 @@ export class SessionManager {
   // ============================================
 
   static async verifyAccessToken(token: string): Promise<SessionData | null> {
+    
     try {
+      // const token = tokenHeadear.replace('Bearer ', '')
       // 1. Verify JWT signature and expiration
       const payload = jwt.verify(token, JWT_SECRET) as JWTPayload;
 
-      console.log({payload})
+      // console.log({payload})
       // 2. Check if token is blacklisted (for logout before expiry)
       const isBlacklisted = await redisClient.exists(`blacklist:${token}`);
       if (isBlacklisted) {
@@ -112,7 +116,7 @@ export class SessionManager {
 
       // 3. Check if session still exists in Redis
       const sessionData = await this.getSessionFromRedis(payload.sessionId);
-      if (!sessionData) {
+      if (!sessionData.success) {
         return null;
       }
 
@@ -121,7 +125,7 @@ export class SessionManager {
         console.error('Failed to update activity:', err)
       );
 
-      return sessionData;
+      return sessionData.session;
     } catch (error) {
       if (error.name === 'TokenExpiredError') {
         console.log('Token expired');
@@ -141,23 +145,35 @@ export class SessionManager {
       // Verify refresh token
       const payload = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as JWTPayload;
 
+      console.log('refreshToken')
+      console.log({payload})
       // Check if session exists
-      const sessionData = await this.getSessionFromRedis(payload.sessionId);
-      if (!sessionData) {
+      console.time('redis')
+      const data = await this.getSessionFromRedis(payload.sessionId);
+      console.timeEnd('redis')
+      if (!data.success) {
         return null;
       }
+      console.log({session: data.session})
+      const user = {
+        id: data.session.userId,
+        email: data.session.email
+      }
+
+      console.log({user})
 
       // Generate new access token (keep same refresh token)
       const newAccessToken = this.generateAccessToken(
-        sessionData.userId,
+        data.session.userId,
         payload.sessionId,
-        { email: sessionData.email, role: sessionData.role }
+        { email: data.session.email, role: data.session.role }
       );
 
       return {
         accessToken: newAccessToken,
         refreshToken, // Return same refresh token
         sessionId: payload.sessionId,
+        user
       };
     } catch (error) {
       console.error('Refresh token error:', error);
@@ -178,8 +194,8 @@ export class SessionManager {
       await redisClient.del(`session:${sessionId}`);
 
       // 3. Remove from user's active sessions
-      if (sessionData) {
-        await redisClient.sRem(`user:${sessionData.userId}:sessions`, sessionId);
+      if (sessionData.session) {
+        await redisClient.sRem(`user:${sessionData.session.userId}:sessions`, sessionId);
       }
 
       // 4. Blacklist the access token (if provided) to invalidate before expiry
@@ -307,12 +323,25 @@ export class SessionManager {
     });
   }
 
-  private static async getSessionFromRedis(sessionId: string): Promise<SessionData | null> {
+  static async getSessionFromRedis(sessionId: string): Promise<{
+    success: boolean,
+    message: string,
+    session: SessionData | null
+  }> {
     try {
       const data:any = await redisClient.get(`session:${sessionId}`);
-      if (!data) return null;
+      const session: SessionData = JSON.parse(data)
+      if (!session) return {
+        success: false,
+        message: 'session not found',
+        session: null
+      };
 
-      return JSON.parse(data);
+      return {
+        success: true,
+        message: 'Session Found',
+        session: session
+      };
     } catch (error) {
       console.error('Redis get session error:', error);
       return null;
@@ -322,12 +351,12 @@ export class SessionManager {
   private static async updateLastActivity(sessionId: string): Promise<void> {
     try {
       const data = await this.getSessionFromRedis(sessionId);
-      if (data) {
-        data.lastActivity = Date.now();
+      if (data.success) {
+        data.session.lastActivity = Date.now();
         await redisClient.setEx(
           `session:${sessionId}`,
           TTL.SESSION_REDIS,
-          JSON.stringify(data)
+          JSON.stringify(data.session)
         );
       }
     } catch (error) {
@@ -346,9 +375,9 @@ export class SessionManager {
   ): Promise<boolean> {
     try {
       const existing = await this.getSessionFromRedis(sessionId);
-      if (!existing) return false;
+      if (!existing.success) return false;
 
-      const updated = { ...existing, ...metadata };
+      const updated = { ...existing.session, ...metadata };
       await redisClient.setEx(
         `session:${sessionId}`,
         TTL.SESSION_REDIS,

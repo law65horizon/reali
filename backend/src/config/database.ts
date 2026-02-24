@@ -7,6 +7,7 @@ const pool = new Pool({
     host: env.DB_HOST,
     port: Number(env.DB_PORT),
     database: env.DB_DATABASE,
+    min: 5
 });
 
 // -- View for slow queries monitoring

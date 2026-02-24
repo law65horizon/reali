@@ -15,10 +15,12 @@ const reviewSchema = fs.readFileSync(path.join(__dirname, 'review.graphql'), 'ut
 const experienceSchema = fs.readFileSync(path.join(__dirname, 'experience.graphql'), 'utf8');
 const authSchema = fs.readFileSync(path.join(__dirname, 'auth.graphql'), 'utf8');
 const paymentSchema = fs.readFileSync(path.join(__dirname, 'payment.graphql'), 'utf8');
+const roomTypeSchema = fs.readFileSync(path.join(__dirname, 'room_type.graphql'), 'utf8');
 
 export const typeDefs = gql`
   ${userSchema}
   ${propertySchema}
+  ${roomTypeSchema}
   ${bookingSchema}
   ${messageSchema}
   ${reviewSchema}

@@ -20,11 +20,16 @@ import { verifyToken } from './services/auth.js';
 import { createWebhookRouter } from './routes/createWebHook.js';
 import { connectRedis } from './config/redis.js';
 import { authenticateJWT } from './middleware/auth.js';
-
+import { createServer } from 'http';
+import { makeExecutableSchema } from '@graphql-tools/schema';
+import { WebSocketServer } from 'ws';
+import { useServer } from 'graphql-ws/use/ws';
+import SessionManager from './middleware/session.js';
+import { Token } from 'graphql';
 
 
 const app = express();
-const httpServer = http.createServer(app);
+const httpServer = createServer(app);
 
 app.use(cors({
   origin: '*', // Allow all origins for development; restrict in production
@@ -36,11 +41,38 @@ app.use('/webhooks', createWebhookRouter(pool))
 
 app.use(express.json())
 
+const schema = makeExecutableSchema({typeDefs, resolvers})
+
+const wsServer = new WebSocketServer({
+  server: httpServer,
+  path: '/subscriptions'
+})
+
+const serverCleanup = useServer(
+  {
+    schema,
+    context: async (ctx, msg, args) => {
+      return getDynamicContext(ctx, msg, args)
+    },
+  },
+  wsServer
+)
+
 const startServer = async () => {
   const server = new ApolloServer<Context>({
-    typeDefs,
-    resolvers,
-    plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
+    schema,
+    plugins: [
+      ApolloServerPluginDrainHttpServer({ httpServer }),
+      {
+        async serverWillStart() {
+          return {
+            async drainServer() {
+              await serverCleanup.dispose()
+            }
+          }
+        }
+      }
+    ],
     csrfPrevention: false,
     formatError: (error) => {
       console.error('GraphQl Error:', error)
@@ -50,7 +82,7 @@ const startServer = async () => {
   });
 
   try {
-    await createEmailTransporter()
+    // await createEmailTransporter()
     await connectDB();
     await connectRedis()
     await server.start();
@@ -68,18 +100,6 @@ const startServer = async () => {
       '/',
       express.json(),
       expressMiddleware(server, {
-        // context: async ({ req, }) => {
-        //   await new Promise<void>((resolve, reject) => {
-        //     verifyToken({ req, next: (err?: any) => (err ? reject(err) : resolve()) });
-        //   });
-
-        //   return {
-        //     req,
-        //     db: pool,
-        //     pubsub,
-        //     user: (req as any).user
-        //   }
-        // },
         context: async ({req, res}) => {
           await new Promise<void>((resolve, reject) => {
             authenticateJWT(req, res, (err?: any) => (err ? reject(err) : resolve()) )
@@ -102,3 +122,17 @@ const startServer = async () => {
 };
 
 startServer();
+
+const getDynamicContext = async (ctx, msg, args) => {
+  if (ctx.connectionParams.authorization) {
+    const token = ctx.connectionParams.authorization.replace('Bearer ', '')
+    console.log({token})
+    const currentUser = await SessionManager.verifyAccessToken(token);
+    console.log({currentUser})
+    return {user: currentUser}
+  }
+  console.log({not: ctx})
+
+  return null
+}
+

@@ -91,7 +91,7 @@ export function getNestedRequestedFields(info: any): string[] {
       fields.push('address', ...addressFields);
     } else if (selection.name.value === 'property') {
       const propertyFields: string[] = selection.selectionSet?.selections.map((s: any) => {
-        if (s.name.value == 'address' || s.name.value == 'realtor' || s.name.value == '__typename') return '';
+        if (s.name.value == 'address' || s.name.value == 'realtor' || s.name.value == 'images' || s.name.value == '__typename') return '';
         return `p.${s.name.value}`
       }) || [];
       fields.push('property', ...propertyFields);

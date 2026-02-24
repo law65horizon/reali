@@ -1,25 +1,98 @@
 # src/graphql/schema/message.graphql
+enum MessageType {
+  text
+  system
+  booking_update
+  image
+}
+
+type Conversation {
+  id: ID!
+  property: Property
+  host: User!
+  guest: User!
+  booking: Booking
+  last_message_at: DateTime!
+  created_at: DateTime!
+  updated_at: DateTime!
+
+  messages(limit: Int offset: Int): [Message!]!
+  unreadCount: Int!
+  lastMessage: Message
+}
+
 type Message {
   id: ID!
-  chatId: String!
+  conversation: Conversation!
   sender: User!
   content: String!
-  createdAt: String!
+  read_at: DateTime
+  created_at: DateTime!
+  updated_at: DateTime!
+  message_type: MessageType!
+  metadata: JSON
+}
+
+type ConversationEdge {
+  node: Conversation!
+  cursor: String!
+}
+
+type ConversationConnection {
+  edges: [ConversationEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
 }
 
 input MessageInput {
-  chatId: String!
+  conversationId: ID!
   content: String!
+  message_type: MessageType!
 }
 
+input CreateConversationInput {
+  propertyId: ID
+  guestId: ID!
+  bookingId: ID
+  initialMessage: String!
+}
+
+input ConversationFilter {
+  propertyId: ID
+  hasUnread: Boolean
+  searchQuery: String
+}
+
+
 type Query {
-  getMessages(chatId: String!): [Message!]!
+  conversations(
+    first: Int
+    after: String
+    filter: ConversationFilter
+  ): ConversationConnection!
+
+  conversation(conversationId: ID, recipient: ID): Conversation
+
+  messages(
+    conversationId: ID!
+    limit: Int = 50
+    offset: Int = 0
+  ): [Message!]!
+
+  totalUnreadCount: Int
 }
 
 type Mutation {
   sendMessage(input: MessageInput!): Message!
+  createConversation(input: CreateConversationInput!): Conversation!
+  markMessagesAsRead(conversationId: ID!): Boolean!
+  markAllAsRead: Boolean!
 }
 
 type Subscription {
-  messageAdded(chatId: String!): Message!
+  messageAdded(conversationId: ID!): Message
+  messageRead(conversationId: ID!): Message
+  conversationUpdated(userId: ID!): Conversation
 }
+
+scalar JSON

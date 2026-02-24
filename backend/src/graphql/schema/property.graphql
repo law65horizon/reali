@@ -7,6 +7,11 @@ enum ListingStatus {
   ARCHIVED
 }
 
+enum SaleStatus {
+  sale 
+  rent
+}
+
 enum PropertyType {
   APARTMENT
   HOUSE
@@ -35,10 +40,9 @@ type Address {
 
 type Image {
   id: ID!
-  # property_id: ID!
-  url: String!
-  meta_data: String
-  caption: String
+  cdn_url: String!
+  width: Int
+  height: Int
 }
 
 type User {
@@ -62,6 +66,8 @@ type Property {
   speciality: String
   property_type: String!
   sale_status: String!
+  price: Float
+  status: String!
   description: String
   address: Address
   amenities: [String]
@@ -69,31 +75,6 @@ type Property {
   images: [Image!]
   bookings: [PropertyBooking!]!
   reviews: [PropertyReview!]!
-  created_at: DateTime!
-  updated_at: DateTime!
-}
-
-type RoomType {
-  id: ID!
-  property_id: ID!
-  name: String!
-  description: String
-  capacity: Int
-  bedCount: Int
-  bathroomCount: Int
-  sizeSqft: Int
-  basePrice: Float
-  weeklyRate: Float
-  monthlyRate: Float
-  currency: String
-  isActive: Boolean
-  amenities: [String]
-  units: [RoomUnit!]
-  pricing: [RateCalendarEntry!]
-  images: [Image!]
-  property: Property
-  availableUnits: Int
-  totalUnits: Int
   created_at: DateTime!
   updated_at: DateTime!
 }
@@ -112,14 +93,6 @@ input RateCalendarEntryInput {
   isBlocked: Boolean
 }
 
-type RoomUnit {
-  id: ID!
-  room_type_id: ID!
-  unit_code: String
-  floor_number: Int
-  status: String
-}
-
 type PropertyBooking {
   id: ID!
   unit: RoomUnit!
@@ -135,6 +108,8 @@ type PropertyBooking {
 
 type PageInfo {
     hasNextPage: Boolean!
+    hasPreviousPage: Boolean!
+    startCursor: String
     endCursor: String
 }
 
@@ -148,18 +123,55 @@ type PropertyWithRealtor {
 }
 
 input PropertyInput {
-    realtor_id: ID!
-    address: AddressInput!
-    title: String
-    speciality: String
-    amenities: [String!]!
-    price: Float
-    image_urls: [String!]!
-    description: String
-    status: ListingStatus
-    roomTypes: [RoomTypeInput!]
-    property_type: String!
-    sale_status: String!
+  realtor_id: ID!
+  address: AddressInput!
+  title: String
+  speciality: String
+  amenities: [String!]!
+  price: Float
+  images: [ImageInput!]!
+  description: String
+  status: ListingStatus
+  property_type: String!
+  sale_status: String!
+}
+
+input UpdatePropertyInput {
+  realtor_id: ID!
+  address: AddressInput
+  title: String
+  speciality: String
+  amenities: [String!]
+  price: Float
+  images: ImageManageMentInput
+  description: String
+  status: ListingStatus
+  property_type: String
+  sale_status: String
+}
+
+input ImageManageMentInput {
+  add: [ImageInput!]
+
+  remove: [ID!]
+
+  update: [ImageUpdateInput!]
+}
+
+input ImageUpdateInput {
+    id: ID!
+    display_order: Int
+    is_primary: Boolean
+  }
+
+input ImageInput {
+  storage_key: String!
+  uri: String!
+  fileName: String
+  mimeType: String
+  fileSize: Int
+  width: Int
+  height: Int
 }
 
 input RoomUnitInput {
@@ -248,7 +260,8 @@ type CloudinarySignature {
 }
 
 input SearchRoomsInput {
-  propertyType: String
+  propertyType: [String!]
+  sale_status: SaleStatus
   beds: Int
   bathrooms: Int
   minPrice: Float
@@ -256,9 +269,10 @@ input SearchRoomsInput {
   minSize: Float
   maxSize: Float
   amenities: [String!]
-  address: String
-  checkIn: Date
-  checkOut: Date
+  query: String
+  value: String
+  checkIn: String
+  checkOut: String
   first: Int = 20
   after: String
   latitude: Float
@@ -266,12 +280,65 @@ input SearchRoomsInput {
   radius: Int
 }
 
+type OtherInfo {
+  title: String
+}
+
+type QuickSearch {
+  id: ID
+  category: String
+  created_at: String
+  other: OtherInfo
+  city: NameIDPair
+  country: NameIDPair
+  geom: String
+  postal_code: String
+  street: String
+}
+
+type NameIDPair {
+  id: ID!
+  name: String!
+}
+
+
+type QuickSearchResult {
+  search_type: String
+  quickSearch: [QuickSearch]
+}
+
+type RecentSearches {
+  userId: ID!
+  tag: String!
+  postal_code: Int
+  city: String
+  street: String
+  latitude: Float
+  longitude: Float
+}
+
+input RecentSearchesInput {
+  userId: ID!
+  tag: String!
+  postal_code: Int
+  city: String
+  street: String
+  latitude: Float
+  longitude: Float
+}
+
+input WishlistInput {
+  propertyId: String!
+}
+
 type Query {
+  quickSearch(query: String, latitude: Float, longitude: Float, radius: Float): QuickSearchResult
   searchRoomTypes(input: SearchRoomsInput): RoomTypeConnection!
+  getRoomTypes(ids: [ID!]): RoomTypeConnection!
 
   getProperty(id: ID!): Property
 
-  getListings(realtor_id: ID!): [Property!]!
+  myProperties(realtor_id: ID!): [Property!]!
 
   getRoomType(id: ID!): RoomType
   # Get calendar pricing and availability for a room type
@@ -279,17 +346,20 @@ type Query {
 
   # Get available units in a room type
   getAvailableUnits(id: ID!, checkIn: Date, checkOut: Date): [RoomUnit!]!
+
+  searchRecents(userId: ID!): [RecentSearches]
 }
 
 type Mutation {
   createProperty(input: PropertyInput!): Property!
-  addRoomUnit(input: RoomUnitInput!): RoomUnit!
-  updateProperty(id: ID!, input: PropertyInput!): Property!
-  updateRoomUnit(input: RoomUnitInput!): RoomUnit!
+  updateProperty(id: ID!, input: UpdatePropertyInput!): Property!
   publishProperty(id: ID!): Property!
   archiveProperty(id: ID!): Property!
-  deleteProperty(id: ID!): Boolean!
+  deleteProperty(id: ID!): Response!
   generateCloudinarySignature: CloudinarySignature!
+  addToRecents(input: RecentSearchesInput): RecentSearches!
+  # addToWishLists(input: WishlistInput!): Boolean!
+  # removeFromWishLists(input: WishlistInput!): Boolean!
 }
 
 # Scalar Types

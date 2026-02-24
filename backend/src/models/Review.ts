@@ -5,6 +5,14 @@ import pool from '../config/database.js';
 export interface Review {
   id: number;
   property_id: number;
+  guest_id: number;
+  rating: number;
+  comment?: string;
+  created_at: string;
+}
+
+export interface ReviewInput {
+  bookingId: number;
   user_id: number;
   rating: number;
   comment?: string;
@@ -14,22 +22,41 @@ export interface Review {
 export class ReviewModel {
   constructor(private pool: Pool) {}
 
-  async create(review: Omit<Review, 'id' | 'created_at'>): Promise<Review> {
+  async create(review: Omit<ReviewInput, 'created_at'>): Promise<Review> {
+    const bookingQuery = `
+      SELECT b.room_type_id,  p.id AS property_id, p.realtor_id from bookings b
+      INNER JOIN room_types rt ON rt.id = b.room_type_id
+      INNER JOIN properties p ON p.id = rt.property_id
+      WHERE b.id = $1 AND b.guest_id = $2
+    `
+    const bookingResult = await this.pool.query(bookingQuery, [review.bookingId, review.user_id])
+
+    console.log(bookingResult.rows[0], review.bookingId, review.user_id)
+    if (bookingResult.rows.length === 0) {
+      throw new Error('Booking not found or unauthorized');
+    }
+
+    const booking = bookingResult.rows[0]
+
     const query = `
-      INSERT INTO reviews (property_id, user_id, rating, comment)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO reviews (booking_id, guest_id, room_type_id, property_id, realtor_id, rating, comment)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
     `;
+
     const result = await this.pool.query(query, [
-      review.property_id,
+      review.bookingId,
       review.user_id,
+      booking.room_type_id,
+      booking.property_id,
+      booking.realtor_id,
       review.rating,
       review.comment,
     ]);
     return result.rows[0];
   }
 
-  async findById(id: number): Promise<Review | null> {
+  async findById(id: string): Promise<Review | null> {
     const query = `SELECT * FROM reviews WHERE id = $1`;
     const result = await this.pool.query(query, [id]);
     return result.rows[0] || null;
@@ -41,7 +68,7 @@ export class ReviewModel {
     return result.rows;
   }
 
-  async update(id: number, review: Partial<Review>): Promise<Review | null> {
+  async update(id: string, review: Partial<Review>): Promise<Review | null> {
     const fields = [];
     const values = [];
     let index = 1;
@@ -58,7 +85,7 @@ export class ReviewModel {
     return result.rows[0] || null;
   }
 
-  async delete(id: number): Promise<boolean> {
+  async delete(id: string): Promise<boolean> {
     const query = `DELETE FROM reviews WHERE id = $1`;
     const result = await this.pool.query(query, [id]);
     return (result.rowCount ?? 0) > 0;

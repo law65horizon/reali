@@ -12,6 +12,7 @@ type CreatePaymentIntentResponse {
     bookingId: ID!
     successUrl: String!
     cancelUrl: String!
+    paymentOption: PaymentOption!
   }
 
   type Mutation {
@@ -26,19 +27,9 @@ type CreatePaymentIntentResponse {
   }
 
   type CheckoutSession {
-    sessionId: String!
-    url: String!
     clientSecret: String!
-  }
-
-  type Payment {
-    id: ID!
-    bookingId: Int!
-    amount: Float!
-    currency: String!
-    status: String!
-    paymentMethod: String
-    createdAt: String!
+    payment: Payment!
+    booking: Booking!
   }
 
   type RefundResult {
@@ -51,3 +42,15 @@ type CreatePaymentIntentResponse {
     getPayment(bookingId: Int!): Payment
     getPaymentHistory(userId: Int!): [Payment!]!
   }
+
+type Payment {
+  id: ID!
+  booking_id: ID!
+  amount: Float!
+  currency: String!
+  status: String!
+  refunded_amount: Float
+  refunded_at: String
+  created_at: String
+  payment_method: String
+}
