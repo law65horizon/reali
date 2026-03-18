@@ -2,6 +2,7 @@
 import DraggableModal from '@/components/DraggableModal';
 import { ThemedText } from '@/components/ThemedText';
 import { ErrorState } from '@/components/ui/StateComponents';
+import { CREATE_CHECKOUT_SESSION } from '@/graphql/mutations';
 import { useAuthStore } from '@/stores/authStore';
 import { useTheme } from '@/theme/theme';
 import { calculatePeriod } from '@/utils/calculatePeriod';
@@ -51,15 +52,15 @@ const GET_ROOM_TYPE = gql`
       weekly_rate
       currency
       monthly_rate
-      images {
-        cdn_url
-        id
-      }
       currency
       amenities
       property {
         id
         title
+        images {
+          cdn_url
+          id
+        }
       }
     }
   }
@@ -84,14 +85,6 @@ const CREATE_PAYMENT_INTENT = gql`
     }
   }
 `; 
-
-export const CREATE_CHECKOUT_SESSION = gql`
-  mutation CreateCheckoutSession($input: CreateCheckoutSessionInput!) {
-    createCheckoutSession(input: $input) {
-      clientSecret
-    }
-  }
-`
 
 const GET_RATE_CALENDAR = gql`
   query GetRateCalendar($id: ID!, $startDate: Date!, $endDate: Date!) {
@@ -296,24 +289,24 @@ const ReservationScreen = () => {
         case 'weekly': {
           const fullWeeks = Math.floor(nights/7)
           const rmDays = nights % 7
-          price = fullWeeks * (roomTypeData?.getRoomType.weeklyRate || roomTypeData?.getRoomType.basePrice * 7);
+          price = fullWeeks * (roomTypeData?.getRoomType.weekly_rate || roomTypeData?.getRoomType.base_price * 7);
 
-          price += rmDays * (roomTypeData?.getRoomType.basePrice || 0)
+          price += rmDays * (roomTypeData?.getRoomType.base_price || 0)
           break;
         }
         case 'monthly': {
           const fullMonths = Math.floor(nights/30)
           const rmDays = nights % 30
-          price = fullMonths * (roomTypeData?.getRoomType.monthlyRate || roomTypeData?.getRoomType.basePrice * 30);
+          price = fullMonths * (roomTypeData?.getRoomType.monthly_rate || roomTypeData?.getRoomType.base_price * 30);
 
-          price += rmDays * (roomTypeData?.getRoomType.basePrice || 0)
+          price += rmDays * (roomTypeData?.getRoomType.base_price || 0)
           break;
         }
         default: {
           let dsx = getNightlyRatesInRange(checkInDate, checkOutDate, rateCalendarData?.getAvailability)
           console.log({dsx, checkInDate, checkOutDate})
           setSelectedDateCalendar(dsx)
-          price = sumNightlyRates(dsx) || (roomTypeData?.getRoomType.basePrice * nights)
+          price = sumNightlyRates(dsx) || (roomTypeData?.getRoomType.base_price * nights)
           break
         }
       }
@@ -509,7 +502,6 @@ const ReservationScreen = () => {
 
   // Handle booking submission
   console.log({user})
-
   console.log({data, loading, error: error?.message})
   if (roomTypeLoading) {
     return (
@@ -524,6 +516,7 @@ const ReservationScreen = () => {
   } 
 
   const roomType = roomTypeData?.getRoomType;
+  console.log({roomType: roomType.property.images})
   const pricing = priceData?.calculateBookingPrice;
 
   return (
@@ -535,7 +528,7 @@ const ReservationScreen = () => {
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Image 
-            source={{ uri: roomType?.images?.[0]?.url || 'https://via.placeholder.com/60' }} 
+            source={{ uri: roomType.property.images[0]?.cdn_url || 'https://via.placeholder.com/60' }} 
             style={styles.thumbnail} 
           />
           <View style={styles.headerText}>

@@ -8,8 +8,6 @@ import { useTheme } from '@/theme/theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { StyleSheet } from 'react-native';
 
-const MemoizedIconSymbol = React.memo(IconSymbol);
-const MemoizedMaterialCommunityIcons = React.memo(MaterialCommunityIcons);
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -35,19 +33,7 @@ export default function TabLayout() {
 
   return (
     <Tabs screenOptions={screenOptions}>
-      <Tabs.Screen
-        name="home"
-        options={{
-          title: 'home',
-          tabBarIcon: ({color, focused}) => (
-            <IconSymbol 
-              size={focused ? 26 : 24} 
-              name={focused ? 'magnifyingglass' : 'magnifyingglass'} 
-              color={color} 
-            />
-          )
-        }}
-      />
+
       <Tabs.Screen
         name="bookings"
         options={{
@@ -61,6 +47,7 @@ export default function TabLayout() {
           )
         }}
       />
+      
       <Tabs.Screen
         name="listing"
         options={{

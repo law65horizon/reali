@@ -263,7 +263,14 @@ const HostProperties = () => {
   const user = useAuthStore.getState().user
   const setField = usePropertyStore((state) => state.setField)
 
-  const { data, loading, error, refetch, networkStatus } = useQuery(GET_HOST_PROPERTIES, {variables: {realtorId: user?.id || 3}});
+  const { data, loading, error, refetch, networkStatus } = useQuery(
+    GET_HOST_PROPERTIES, 
+    {
+      variables: {realtorId: user?.id || 3},
+      fetchPolicy: 'cache-and-network'
+    },
+    
+  );
   const isFromCache = !loading && networkStatus === NetworkStatus.ready;
 
   console.log({isFromCache})
@@ -416,7 +423,7 @@ const HostProperties = () => {
 
   const renderPropertyCard = (property: any) => {
     const primaryImage = property.images?.find((img: any) => img.is_primary) || property.images?.[0];
-    const hasRoomTypes = property.property_type === 'APARTMENT' || property.property_type === 'hotel';
+    const hasRoomTypes = property.property_type == 'apartment' || property.property_type == 'hotel';
     // const hasRoomTypes = property.property_type === 'apartment' || property.property_type === 'hotel';
     console.log({hasRoomTypes}, property.property_type)
     return (
@@ -455,13 +462,13 @@ const HostProperties = () => {
 
         {/* Content Section */}
         <View style={styles.cardContent}>
-          <Text style={[styles.propertyTitle, { color: theme.colors.text }]} numberOfLines={2}>
+          <Text style={[styles.propertyTitle, { color: theme.colors.text, textTransform: 'capitalize' }]} numberOfLines={2}>
             {property.title}
           </Text> 
 
           <View style={styles.locationRow}>
             <Ionicons name="location-outline" size={16} color={theme.colors.textSecondary} />
-            <Text style={[styles.locationText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+            <Text style={[styles.locationText, { color: theme.colors.textSecondary, textTransform: 'capitalize' }]} numberOfLines={1}>
               {property.address?.city}, {property.address?.country}
             </Text>
           </View>

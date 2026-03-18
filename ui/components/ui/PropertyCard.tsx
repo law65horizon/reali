@@ -15,7 +15,7 @@ interface PropertyCardProps {
 
 const {width} = Dimensions.get('screen')
 const PropertyCard = ({ property, width_ }: PropertyCardProps) => {
-  console.log({property: property.property.images})
+  console.log({property: property.id})
   const { theme } = useTheme();
   const { toggleFavorite, isFavorite } = useFavoritesStore();
   
@@ -115,9 +115,9 @@ const PropertyCard = ({ property, width_ }: PropertyCardProps) => {
               size={16}
               color={theme.colors.textSecondary}
             />
-            <ThemedText type="caption" secondary>
+            <ThemedText style={{textTransform: 'capitalize'}} type="caption" secondary>
               {city}
-              {country ? `, ${country}` : ''}
+              {/* {country ? `, ${country}` : ''} */}
             </ThemedText>
           </View>
           <View style={[styles.typePill, { backgroundColor: theme.colors.border }]}>

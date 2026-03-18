@@ -22,7 +22,7 @@ type SaleStatus = 'rent' | 'sale';
 export default function BasicInfo() {
   const { theme } = useTheme();
   const basicInfo = usePropertyStore((state) => state.basicInfo)
-  const snapshot = usePropertyStore((state) => state.snapshot)
+  // const snapshot = usePropertyStore((state) => state.snapshot)
   const setField = usePropertyStore((state) => state.setField)
   
   // Form state

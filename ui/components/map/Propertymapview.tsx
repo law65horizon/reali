@@ -352,8 +352,8 @@ const RadiusSliderPanel = ({
 
 type DrawMode = 'idle' | 'placingCenter' | 'adjustingRadius';
 
-export default function PropertyMapView({ properties: dod, onCircleChange }: PropertyMapViewProps) {
-  const properties = [dod[0]]
+export default function PropertyMapView({ properties, onCircleChange }: PropertyMapViewProps) {
+  // const properties = [dod[0]]
   const { theme } = useTheme();
   const mapRef = useRef<MapView>(null);
 

@@ -70,3 +70,11 @@ export const UPDATE_PROFILE = gql`
     }
   }
 `;
+
+export const CREATE_CHECKOUT_SESSION = gql`
+  mutation CreateCheckoutSession($input: CreateCheckoutSessionInput!) {
+    createCheckoutSession(input: $input) {
+      clientSecret
+    }
+  }
+`

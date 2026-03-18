@@ -1,11 +1,11 @@
-// app/(guest)/_layout.tsx
+// app/(host)/_layout.tsx
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useTheme } from '@/theme/theme';
 import { useNetInfo } from "@react-native-community/netinfo";
 import { Stack } from 'expo-router';
 import { StatusBar, Text, View } from 'react-native';
 
-export default function GuestLayout() {
+export default function HostLayout() {
   const {theme } = useTheme()
   const {isInternetReachable, isConnected} = useNetInfo()
   console.log(isInternetReachable, isConnected)

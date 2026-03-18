@@ -4,12 +4,9 @@ import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useTheme } from '@/theme/theme';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { router, useSegments } from 'expo-router';
+import { router, Stack, useSegments } from 'expo-router';
 import { Dimensions, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { HideIconProvider } from './HideIconContext';
-import TopTabsNavigator from './TobBarNavigator';
 
 const {width, height} = Dimensions.get('screen')
 export default function TopTabLayout() {
@@ -53,7 +50,7 @@ export default function TopTabLayout() {
           </View>
   
         </Pressable>
-        <View style={{ flexDirection: 'row', alignItems: "center", justifyContent: 'space-between', paddingHorizontal: 10, width: 50,}} >
+        {/* <View style={{ flexDirection: 'row', alignItems: "center", justifyContent: 'space-between', paddingHorizontal: 10, width: 50,}} >
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Notifications"
@@ -62,11 +59,11 @@ export default function TopTabLayout() {
           >
             <MaterialCommunityIcons name="bell-badge" size={24} color={theme.colors.text} />
           </Pressable>
-        </View>
+        </View> */}
        </View>
-        <HideIconProvider>
-          <TopTabsNavigator headerHeight={headerHeight}/>
-        </HideIconProvider>
+        <Stack>
+          <Stack.Screen name='homes' options={{headerShown: false}} />
+        </Stack>
       </View>
     );
 }
@@ -78,6 +75,8 @@ const styles = StyleSheet.create({
     // paddingHorizontal: 8
   },
   header: {
+    paddingBottom: 10,
+    // backgroundColor: 'red'
     // position: 'fixed',
     // top: 0,
     // left: 0,

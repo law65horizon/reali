@@ -102,7 +102,7 @@ const httpLink = new HttpLink({
 
 const wsLink = new GraphQLWsLink(
   createClient({
-    url: "wss://4447-197-211-52-72.ngrok-free.app/subscriptions",
+    url: "wss://18a3-98-97-76-170.ngrok-free.app/subscriptions",
     // url: "ws://192.168.85.1:4000/subscriptions",
     connectionParams: async () => {
       const token = await SecureStore.getItemAsync('accessToken')

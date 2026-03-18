@@ -51,7 +51,7 @@ const ImageCarousel = ({ imageHeight, width, images, showNumber, modal, style, u
                 }}
               >
                 <Image
-                  source={uri ? { uri: item } : item}
+                  source={uri ? { uri: item || 'https://res.cloudinary.com/dajzo2zpq/image/upload/v1773301917/properties/ghnebuerhfw7v4x0eo8r.jpg' } : item}
                   style={[
                     style,
                     {

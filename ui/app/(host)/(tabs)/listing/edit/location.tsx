@@ -33,7 +33,11 @@ export default function LocationScreen() {
     state: addressInitial?.state || "",
     country: addressInitial?.country || "",
     postcode: addressInitial?.postcode || "",
+    latitude: addressInitial?.latitude || undefined,
+    longitude: addressInitial?.longitude || undefined
   });
+
+  console.log({formData})
   const [markerCoords, setMarkerCoords] = useState({
     latitude: 0,
     longitude: 0,
@@ -55,23 +59,30 @@ export default function LocationScreen() {
   }, []);
 
   const handleFormSubmit = async () => {
-    const query = `${formData.street}, ${formData.city}, ${formData.state}, ${formData.country} ${formData.postcode}`;
+    const query = ` ${formData.city}, ${formData.state}, ${formData.country}`;
     setLoadingAddress(true);
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          query
-        )}&limit=1`
-      );
-      const data = await res.json();
-      if (data[0]) {
-        const { lat, lon } = data[0];
-        setMarkerCoords({
-          latitude: parseFloat(lat),
-          longitude: parseFloat(lon),
-        });
-        // setIsMapOpen(true);
-        fetchAddress(parseFloat(lat), parseFloat(lon));
+      console.log({query: query.length})
+      if (query.length <= 7) {
+        setIsMapOpen(true);
+      }
+      else {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            query
+          )}&limit=1`
+        );
+        const data = await res.json();
+        console.log({data})
+        if (data[0]) {
+          const { lat, lon } = data[0];
+          setMarkerCoords({
+            latitude: parseFloat(lat),
+            longitude: parseFloat(lon),
+          });
+          setIsMapOpen(true);
+          fetchAddress(parseFloat(lat), parseFloat(lon));
+        }
       }
     } finally {
       setLoadingAddress(false);
@@ -111,7 +122,7 @@ export default function LocationScreen() {
     let loc = await Location.getCurrentPositionAsync({});
     const { latitude, longitude } = loc.coords;
     setMarkerCoords({ latitude, longitude });
-    setIsMapOpen(true);
+    // setIsMapOpen(true);
     console.log({loc})
     fetchAddress(latitude, longitude);
   };
@@ -303,13 +314,11 @@ export default function LocationScreen() {
             marginTop: 10,
           }}
         >
-          {loadingAddress ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
+          {loadingAddress ? <ActivityIndicator /> :
             <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>
               Locate on Map
             </Text>
-          )}
+          }
         </TouchableOpacity>
 
         {/* Use Current Location button */}

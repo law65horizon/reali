@@ -1,6 +1,6 @@
 // screens/BookingDetails.tsx params
-import { CREATE_CHECKOUT_SESSION } from '@/app/(guest)/(modals)/reserve/[query]';
 import { ErrorState } from '@/components/ui/StateComponents';
+import { CREATE_CHECKOUT_SESSION } from '@/graphql/mutations';
 import { useBookingsStore } from '@/stores/bookingStore';
 import { useTheme } from '@/theme/theme';
 import { gql, useMutation, useQuery } from '@apollo/client';
@@ -58,6 +58,10 @@ query GetBooking($getBookingId: ID!) {
         country
         postal_code
         street
+      }
+      images {
+        cdn_url
+        id
       }
       title
       realtor {
@@ -594,7 +598,7 @@ export default function BookingDetails({ route}: any) {
        onScroll={handleScroll} contentContainerStyle={{paddingBottom: 100}} showsVerticalScrollIndicator={false}>
         <View>
           <Image
-            source={{ uri: booking.property?.imageUrl || 'https://res.cloudinary.com/dajzo2zpq/image/upload/v1752247182/properties/wlf2uijbultztvqptnka.jpg'  }}
+            source={{ uri: booking.property?.images[0]?.cdn_url || 'https://res.cloudinary.com/dajzo2zpq/image/upload/v1752247182/properties/wlf2uijbultztvqptnka.jpg'  }}
             style={styles.headerImage}
           />
           <View

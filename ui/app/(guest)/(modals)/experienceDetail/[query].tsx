@@ -98,6 +98,7 @@ const PropertyDetailsScreen = () => {
 
   // console.log({query})
   const {data, loading, error, refetch} = useGetProperty(parseInt(`${query}`))
+  // console.log({d})
   // const [isFav, setFav] = useState(isFavorite(data?.id))
   const isFav = () => isFavorite(data?.id);
 
@@ -107,7 +108,7 @@ const PropertyDetailsScreen = () => {
   }, [data?.id, toggleFavorite]);
 
   
-  console.log({data: data?.reviews})
+  console.log({data: data?.id})
   // console.log({p: property.amenities, error})
 
 
@@ -139,7 +140,7 @@ const PropertyDetailsScreen = () => {
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <ActivityIndicator size="large"  />
       </View>
     );
   } 
@@ -419,7 +420,12 @@ const PropertyDetailsScreen = () => {
             </View>
           ))}
 
-          {data.totalReviews > data.reviews.length &&<TouchableOpacity style={[styles.showMoreButton, { borderColor: colors.border }]}>
+          {true &&
+          <TouchableOpacity style={[styles.showMoreButton, { borderColor: colors.border }]} onPress={() => router.push({
+            pathname: '/reviews/[property]',
+            params: {property: 1}
+          })}>
+          {/* {data.totalReviews > data.reviews.length &&<TouchableOpacity style={[styles.showMoreButton, { borderColor: colors.border }]}> */}
             <Text style={[styles.showMoreText, { color: colors.text }]}>
               Show all {data.totalReviews} reviews
             </Text>
@@ -430,13 +436,13 @@ const PropertyDetailsScreen = () => {
 
         {/* Location */}
         <View style={[styles.section, { backgroundColor: colors.background }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 10 }]}>
             Where you'll be
           </Text>
-          <ThemedText style={{paddingTop: 10, paddingBottom: 15}}>{data.property.address?.city + ", " + data.property.address?.country} </ThemedText>
+          {/* <ThemedText style={{paddingTop: 10, paddingBottom: 15, textTransform: ca}}>{data.property.address?.city + ", " + data.property.address?.country} </ThemedText> */}
           <View style={[styles.mapPlaceholder, { backgroundColor: colors.backgroundSec }]}>
             <MaterialIcons name="location-on" size={40} color={colors.primary} />
-            <Text style={[styles.mapText, { color: colors.textSecondary }]}>
+            <Text style={[styles.mapText, { color: colors.textSecondary, textTransform: 'capitalize' }]}>
               {data.property.address?.city + ", " + data.property.address?.country}
             </Text>
           </View>
@@ -456,7 +462,7 @@ const PropertyDetailsScreen = () => {
                 source={require('@/assets/images/host-avatar.jpg')} // Replace with actual host image
                 style={styles.hostAvatar}
               />
-              <ThemedText type='subtitle'>{data.property.realtor.name}</ThemedText>
+              <ThemedText type='subtitle'>{data.property.realtor.name.split(' ')[0]}</ThemedText>
               <ThemedText type='defaultSemiBold'>SuperHost</ThemedText>
             </View>
             <Line orientation='vertical' style={{marginHorizontal: 40}} />

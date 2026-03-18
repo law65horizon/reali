@@ -16,6 +16,7 @@ import {
 // Import tab screens
 import { useBookingFilter } from '@/stores/bookingStore';
 import ActiveTabScreen from './ActiveTab';
+import AllTabScreen from './All';
 import UpcomingTabScreen from './UpcomingTab';
 
 function StatsTabBar({
@@ -110,7 +111,7 @@ function StatsTabBar({
 
 const GET_BOOKINGS_SUMMARY = gql`
   query GetBookingsSummary {
-    getHostBookings(limit: 1) {
+    myBookingsSummary {
       pending_count
       upcoming_count
       active_count
@@ -168,13 +169,14 @@ export default function BookingsDashboardScreen() {
     guestType: 'all',
   });
 
-  const { data, loading, refetch } = useQuery(GET_BOOKINGS_SUMMARY, {
-    // pollInterval: 30000, // Refresh every 30 seconds
+  const { data: summary, loading, refetch } = useQuery(GET_BOOKINGS_SUMMARY, {
+    pollInterval: 30000, // Refresh every 30 seconds
   });
 
   const { data: propertiesData } = useQuery(GET_HOST_PROPERTIES);
 
-  const stats = mock.data?.getHostBookings;
+  const stats = summary?.myBookingsSummary;
+  // const stats = mock.data?.getHostBookings;
   const properties = mockProperties.data?.myProperties || [];
   // const stats = data?.getHostBookings;
   // const properties = propertiesData?.myProperties || [];
@@ -274,7 +276,7 @@ export default function BookingsDashboardScreen() {
       >
         <Tab.Screen name="Upcoming" component={UpcomingTabScreen} />
         <Tab.Screen name="Active" component={ActiveTabScreen} />
-        {/* <Tab.Screen name="All" component={AllTabScreen} /> */}
+        <Tab.Screen name="All" component={AllTabScreen} />
       </Tab.Navigator>
 
       {/* Search & Filter Modal */}

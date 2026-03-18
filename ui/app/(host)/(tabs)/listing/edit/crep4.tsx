@@ -21,6 +21,8 @@ const CREATE_PROPERTY = gql`
 mutation Mutation($input: PropertyInput!) {
   createProperty(input: $input) {
     id
+    title
+    price
     sale_status
   }
 }
@@ -95,6 +97,7 @@ export default function CreatePropertyStep4() {
                   id
                   title
                   price
+                  sale_status
                 }
               `
             })
@@ -206,7 +209,10 @@ export default function CreatePropertyStep4() {
 
       const { data, errors } = await createProperty({ variables: { input } });
 
-      console.log({data: data.createProperty, errors})
+      console.log({data: data?.createProperty, errors})
+      if (errors) {
+        Alert.alert('Error', errors[0].message)
+      }
 
       Alert.alert(
         'Success!',
@@ -222,8 +228,10 @@ export default function CreatePropertyStep4() {
           {
             text: 'Back to Dashboard',
             onPress: () => {
-              router.dismissAll()
-              router.push('/(host)/(tabs)/listing/properties')
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "listing" as never }],
+              });
             },
           },
         ]
@@ -255,6 +263,7 @@ export default function CreatePropertyStep4() {
       
       const input:any = {
         realtor_id: user.id,
+        status: publishImmediately ? 'PUBLISHED' : 'DRAFT',
       }
       {
         if (basicInfo.propertyType !== snapshot.basicInfo.propertyType) input.property_type = basicInfo.propertyType
@@ -559,7 +568,7 @@ export default function CreatePropertyStep4() {
             ) : (
               <>
                 <Text style={styles.submitButtonText}>
-                  Edit
+                  {publishImmediately ? 'Publish Property' : 'Edit'}
                 </Text>
                 <Ionicons name="checkmark" size={20} color="#FFFFFF" />
               </>

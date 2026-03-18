@@ -164,6 +164,7 @@ const RedesignedSearch = () => {
 
   const handleSubmit = async(input: SubmitInput) => {
     const value = (input.value ?? query).trim();
+    console.log({value})
     if (!value) return;
 
     if (input.type == 'search') {
@@ -175,7 +176,7 @@ const RedesignedSearch = () => {
           [input.searchType]: input.value
         })
         if (!user) return
-        await addToRecents({
+        addToRecents({
           variables: {
             input: {
               userId: user.id,
@@ -242,7 +243,7 @@ const RedesignedSearch = () => {
         accessibilityRole="button"
         accessibilityState={{ selected: segment === key }}
       >
-        <ThemedText type="defaultSemiBold" style={{ color: theme.colors.text }}>{label}</ThemedText>
+        <ThemedText type="defaultSemiBold" style={{ color: theme.colors.text, }}>{label}</ThemedText>
       </Pressable>
       {/* {divider && segment == 'sold' ? <View style={[styles.segmentDivider, { backgroundColor: theme.colors.border }]} />: null}
       {divider && segment == 'for-rent' ? <View style={[styles.segmentDivider, { backgroundColor: theme.colors.border }]} />: null} */}
@@ -253,9 +254,9 @@ const RedesignedSearch = () => {
     switch (tag) {
       case 'city': {
         return (
-          <View style={{justifyContent: 'space-between', height: 40}}>
-            <ThemedText style={{ marginLeft: 10 }}>{item?.city?.name}</ThemedText>
-            <ThemedText style={{ marginLeft: 10, color: theme.colors.textSecondary }}>{item?.country?.name} </ThemedText>
+          <View style={{justifyContent: 'space-between', height: 40, flex:1}}>
+            <ThemedText style={{ marginLeft: 10, textTransform: 'capitalize' }}>{item?.city?.name}</ThemedText>
+            <ThemedText style={{ marginLeft: 10, textTransform: 'capitalize', color: theme.colors.textSecondary }}>{item?.country?.name} </ThemedText>
           </View>
         )
       }
@@ -393,7 +394,7 @@ const RedesignedSearch = () => {
               style={{padding: 12, flexDirection: 'row', alignItems: 'center', borderBottomWidth: index+1== dataToRender?.length ? 0:1, borderColor: theme.colors.border}}
             >
               <Ionicons name={item.type === 'recent' ? 'time-outline' : 'sparkles-outline'} size={22} color={theme.colors.accent} />
-              <ThemedText style={{ marginLeft: 10 }}>{item.title}</ThemedText>
+              <ThemedText style={{ marginLeft: 10, textTransform: 'capitalize', width: '100%' }}>{item.title}</ThemedText>
             </Pressable>
           ))}
         </View>

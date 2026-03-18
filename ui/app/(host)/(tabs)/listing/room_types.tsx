@@ -266,6 +266,7 @@ export default function RoomTypesScreen() {
   const property = data?.getProperty;
   const roomTypes = property?.roomTypes || [];
   console.log(propertyId, data?.getProperty.roomTypes)
+  console.log({formSnapShot})
 
   const handleDeleteRoomType = (roomTypeId: string, roomTypeName: string) => {
     Alert.alert(
@@ -746,14 +747,15 @@ export default function RoomTypesScreen() {
                 <Text style={[styles.modalButtonText, { color: theme.colors.text }]}>Cancel</Text>
               </TouchableOpacity>
 
-              {formSnapShot ? 
+              {formSnapShot.name ? 
                 <TouchableOpacity
                   style={[styles.modalButton, { backgroundColor: theme.colors.primary }]}
                   onPress={handleEditRoomType}
                 >
                   {isSubmitting ?
                    <ActivityIndicator size={'small'} /> : 
-                   <Text style={styles.modalButtonText}>Edit Room Type</Text>}
+                   <Text style={styles.modalButtonText}>Edit Room Type</Text>
+                  }
                 </TouchableOpacity> :
                 <TouchableOpacity
                   style={[styles.modalButton, { backgroundColor: theme.colors.primary }]}
@@ -761,7 +763,8 @@ export default function RoomTypesScreen() {
                 >
                   {isSubmitting ?
                    <ActivityIndicator size={'small'} /> : 
-                   <Text style={styles.modalButtonText}>Create Room Type</Text>}
+                   <Text style={styles.modalButtonText}>Create Room Type</Text>
+                  }
                 </TouchableOpacity>
               }
             </View>

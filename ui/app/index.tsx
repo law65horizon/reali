@@ -5,7 +5,7 @@ import React from 'react'
 const Index = () => {
   const mode = useAuthStore(state => state.mode)
   // return true ? <Redirect href={'/(host)/(tabs)/home/(toptabs)/Homes'} /> : <Redirect href={'/(guest)/(tabs)/home/(toptabs)/Homes'} />
-  return mode === 'host' ? <Redirect href={'/(host)/(tabs)/home/(toptabs)/Homes'} /> : <Redirect href={'/(guest)/(tabs)/home/(toptabs)/Homes'} />
+  return mode === 'host' ? <Redirect href={'/(host)/(tabs)/bookings/dashboard'} /> : <Redirect href={'/(guest)/(tabs)/home/(toptabs)/homes'} />
 }
 
 export default Index

@@ -31,6 +31,10 @@ query MyBookings {
     property {
       id
       title
+      images {
+        id
+        cdn_url
+      }
       address {
         city
         country
@@ -64,7 +68,7 @@ export default function TripsDashboard({ navigation }: any) {
   const {data, error, loading, refetch} = useQuery(GET_MY_BOOKINGS)
   const [isRefetching, setIsRefetching] = useState(false)
   const bookings: any[] = data?.myBookings || []
-  // console.log(data?.myBookings[0])
+  // console.log(data?.myBookings[0].property.images)
   console.log({error})
   const categorizedBookings = useMemo(() => {
     // console.log({bookings})
@@ -164,7 +168,7 @@ export default function TripsDashboard({ navigation }: any) {
         <View style={styles.imageSection}>
           <Image
             source={{ uri:  
-              'https://res.cloudinary.com/dajzo2zpq/image/upload/v1770056771/properties/qsazerxt69htzu8n4xtx.jpgs'
+              booking.property.images[0]?.cdn_url || "https://res.cloudinary.com/dajzo2zpq/image/upload/v1773301917/properties/ghnebuerhfw7v4x0eo8r.jpg"
             }}
             style={styles.tripImage}
           />
@@ -360,7 +364,7 @@ export default function TripsDashboard({ navigation }: any) {
           
           <TouchableOpacity
             style={[styles.browseButton, { backgroundColor: theme.colors.card }]}
-            onPress={() => router.push('/(guest)/(tabs)/home/(toptabs)/Homes')}
+            onPress={() => router.push('/(guest)/(tabs)/home/(toptabs)/homes')}
             activeOpacity={0.8}
           >
             <Ionicons name="search-outline" size={20} color={theme.colors.text} />
@@ -451,7 +455,7 @@ export default function TripsDashboard({ navigation }: any) {
             {activeTab !== 'past' && (
               <TouchableOpacity
                 style={[styles.exploreButton, { backgroundColor: theme.colors.primary }]}
-                onPress={() => navigation.navigate('Explore')}
+                onPress={() => router.push('/(guest)/(tabs)/home/(toptabs)/homes')}
               >
                 <Text style={styles.exploreButtonText}>Explore Properties</Text>
               </TouchableOpacity>
@@ -633,6 +637,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 16,
     left: 16,
+    width: '100%'
   },
   cityText: {
     color: '#FFFFFF',
@@ -640,11 +645,14 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -0.5,
     marginBottom: 2,
+    textTransform: 'capitalize',
   },
   countryText: {
     color: 'rgba(255,255,255,0.9)',
     fontSize: 14,
     fontWeight: '500',
+    textTransform: 'capitalize',
+    flex: 1
   },
   cardContent: {
     paddingHorizontal: 10,

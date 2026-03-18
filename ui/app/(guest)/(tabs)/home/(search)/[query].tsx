@@ -69,6 +69,8 @@ export default function ListView() {
     }
   }, []);
 
+  console.log({parsedQuery})
+
   // ── Data fetching ─────────────────────────────────────────────────────────
   const {
     properties: data,
@@ -98,7 +100,7 @@ export default function ListView() {
     []
   );
 
-  const keyExtractor = useCallback((item: any) => item.id, []);
+  const keyExtractor = useCallback((item: any) => item?.id, []);
 
   const ListEmptyComponent = useCallback(() => {
     if (loading) {
@@ -122,13 +124,13 @@ export default function ListView() {
     );
   }, [hasNextPage, data.length]);
 
-  const ItemSeparatorComponent = useCallback(
-    () => <View style={styles.separator} />,
-    []
-  );
+  // const ItemSeparatorComponent = useCallback(
+  //   () => <View style={styles.separator} />,
+  //   []
+  // );
 
   // ── Full-screen loading state ─────────────────────────────────────────────
-  if (loading && !data) {
+  if (loading) {
     return (
       <View style={styles.container}>
         {[0, 1, 2].map((item) => (
@@ -138,6 +140,9 @@ export default function ListView() {
     );
   }
 
+  
+
+  console.log({data})
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* ── Search / Filter header (floats above map) ── */}
@@ -209,7 +214,7 @@ export default function ListView() {
           data={data}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
-          ItemSeparatorComponent={ItemSeparatorComponent}
+          // ItemSeparatorComponent={ItemSeparatorComponent}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={ListEmptyComponent}
@@ -268,10 +273,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingBottom: 100,
     paddingTop: 16,
+    gap: 16
   },
-  separator: {
-    height: 16,
-  },
+  
 });
 
 // // screens/ListView.tsx

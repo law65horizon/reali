@@ -5,6 +5,7 @@ import { LOGOUT } from '@/graphql/mutations';
 import { client, setOnAuthStateUpdate } from '@/lib/apolloClient';
 import { setOnTokenRefreshFailed } from '@/lib/authUtils';
 import { gql } from '@apollo/client';
+import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
 import { create } from 'zustand';
@@ -14,7 +15,7 @@ export type userMode = 'guest' | 'host'
 const GET_SESSION = gql`
 query GetSession($sessionId: String!) {
   getSession(sessionId: $sessionId) {
-    Session {
+    session {
       deviceId
       user {
         id
@@ -154,15 +155,16 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         console.log('getting session')
         const get_session = await client.query({
           query: GET_SESSION,
-          variables: {sessionId}
+          variables: {sessionId},
+          fetchPolicy: 'network-only'
         })
         console.log('session')
 
         const sessionData = get_session.data?.getSession
         // console.log({session: session.data.getSession})
-        // console.log({sessionData})
+        console.log({sessionData})
 
-        if (sessionData.success && sessionData.session.user) {
+        if (sessionData.success && sessionData.session?.user) {
           set({
             user: sessionData.session.user,
             accessToken,
@@ -176,8 +178,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           set({
             isLoading: false, mode: 'guest'
           })
+          router.push('/(guest)/(auth)/auth_page')
         }
       } catch (error:any) {
+        console.log('eios', {error})
         set({
           user,
           accessToken,

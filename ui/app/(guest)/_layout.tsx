@@ -12,7 +12,7 @@ export default function GuestLayout() {
         {/* <Stack.Screen name="index" options={{ headerShown: true }} /> */}
         {/* <Stack.Screen name="+not-found" /> */}
         <Stack.Screen
-          name="(modals)/reviews/[modal]"
+          name="(modals)/reviews/[property]"
           options={{
             presentation: 'modal',
             animation: 'fade',
